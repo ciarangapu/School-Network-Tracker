@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Registration</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <h1>Welcome To Student Registration</h1>
+    <div class="container">        
+        <form id="login-form">          
+            <label for="name">Name:</label>
+            <input type="text" id="name" placeholder="Name" required>            
+            <label for="login-mac">MAC Address:</label>
+            <input type="text" id="login-mac" placeholder="XX:XX:XX:XX:XX:XX" required>
+            <label for="login-email">Email:</label>
+            <input type="email" id="login-email" placeholder="Email" required>
+            <label class="custom-checkbox">
+                <input type="checkbox" id="remember" name="remember">
+                Remember me
+            </label>
+            <button type="submit">Register</button>
+            <p>Already have an account? <a href="./indext.html">Login.</a></p>
+        </form>
+    </div>
+    <script src="./bundle.js"></script>
+</body>
+</html>

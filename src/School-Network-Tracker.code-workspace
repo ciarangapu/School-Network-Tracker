@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "School-Network-Tracker",
+			"path": "../../../fullstack_development/School-Network-Tracker"
+		},
+		{
+			"name": "src",
+			"path": "."
+		}
+	],
+	"settings": {}
+}
