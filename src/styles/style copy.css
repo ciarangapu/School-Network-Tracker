@@ -1,0 +1,197 @@
+* {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+.logo {
+    margin: 13px;
+    background-color: #ffcd33;
+    width: 95%;
+    height: 90px;
+    padding-top: 18px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
+    border-radius: 0.9rem;
+    text-align: center; /* Center the logo */
+}
+
+.content {
+    display: flex;
+    margin: 10px;
+    background-color: #ffcd33;
+    width: 95%; 
+    border-radius: 0.5rem;
+    height: auto; 
+}
+
+.attendance-title {
+    color: black;
+    margin-left: 20px;
+    font-weight: 900;
+    font-size: 40px;
+    padding: 20px;
+    cursor: pointer;
+}
+
+.attendance {
+    display: none; 
+    margin-top: 10px;
+    background-color: #fff; /* Background for attendance section */
+    border-radius: 0.5rem; /* Rounded corners */
+    padding: 10px; /* Padding for better spacing */
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+}
+
+h4 {
+    font-size: 25px;
+    margin-bottom: 10px; /* Spacing below headings */
+}
+
+.day, .week, .month {
+    margin: 5px 0;
+    font-size: 20px;
+    margin-left: 15px;
+    cursor: pointer;
+    color: #333; /* Darker text color for better readability */
+}
+
+.make, .many, .menu {
+    cursor: pointer;
+}
+
+.status-box {
+    border: 2px solid #cfc8c8;
+    padding: 7px;
+    border-radius: 10px;
+    flex: 1; 
+    margin-left: 10px;
+    max-width: 85%; 
+    color: black; 
+    background-color: #fff; 
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2); 
+}
+
+footer p {
+    margin: 15px;
+    padding: 3px 15px;
+    background-color: black;
+    color: white; 
+    width: auto;
+    border-radius: 3px;
+    margin-left: 20px;
+    margin-bottom: 20px;
+}
+
+h1 {
+  text-align: center;
+  color: #333;
+}
+
+.calendar-container {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.calendar-controls {
+  margin-bottom: 10px;
+}
+
+#calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.day {
+  padding: 10px;
+  text-align: center;
+  border: 1px solid #ddd;
+  /* background-color: #fff; */
+  cursor: pointer;
+ font-size: 20px;
+}
+
+.day:hover {
+  background-color: #e0e0e0;
+}
+
+.day.header {
+  background-color: #007bff;
+  color: #fff;
+  font-weight: bold;
+}
+
+.day.has-data {
+  background-color: #d4edda;
+}
+
+.day.selected {
+  background-color: #007bff;
+  color: #fff;
+}
+
+.attendance-details {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 10px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+th {
+  background-color: #007bff;
+  color: #fff;
+}
+
+button {
+  padding: 10px 15px;
+  border: none;
+  background-color: #007bff;
+  color: #fff;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+
+.export-buttons {
+  margin-bottom: 20px;
+  margin-left: 600px;
+}
+
+.export-buttons button {
+  margin-right: 10px;
+  padding: 10px 15px;
+  background-color: #4CAF50; /* Green */
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.export-buttons button:hover {
+  background-color: #45a049; /* Darker green */
+}

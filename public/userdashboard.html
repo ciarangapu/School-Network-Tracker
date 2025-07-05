@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard</title>
+    <link rel="stylesheet" href="/src/styles/style copy.css">
+</head>
+<body>
+    <main>
+        <div class="logo">
+         <img src="/assets/Screenshot 2025-06-19 205647.png" alt="">
+        </div>
+        <section class="content">
+            <div>
+                <h3 class="attendance-title" id="toggleAttendance">Attendance</h3>
+                <hr>
+
+                <div id="attendance" class="attendance">
+
+                    <!-- Daily Section -->
+                    <div class="make" id="dailySection">
+                        <h4 id="toggleDaily">Daily Attendance</h4>
+                        <div id="daily" class="attendance">
+                            <p class="day" id="monday">Monday:</p>
+                            <p class="day">Tuesday:</p>
+                            <p class="day">Wednesday:</p>
+                            <p class="day">Thursday:</p>
+                            <p class="day">Friday:</p>
+                        </div>
+                    </div>
+
+                    <footer>
+                        <p></p>
+                    </footer>
+
+                    <!-- Weekly Section -->
+                    <div class="many" id="weeklySection">
+                        <h4 id="toggleWeekly">Weekly Attendance</h4>
+                        <div id="weekly" class="attendance">
+                            <p class="week">Week 1:</p>
+                            <p class="week">Week 2:</p>
+                            <p class="week">Week 3:</p>
+                            <p class="week">Week 4:</p>
+                        </div>
+                    </div>
+
+                    <footer>
+                        <p></p>
+                    </footer>
+
+                    <!-- Monthly Section -->
+                    <div class="menu" id="monthlySection">
+                        <h4 id="toggleMonthly">Monthly Attendance</h4>
+                        <div id="monthly" class="attendance">
+                            <p class="month">January:</p>
+                            <p class="month">February:</p>
+                            <p class="month">March:</p>
+                            <p class="month">April:</p>
+                            <p class="month">May:</p>
+                            <p class="month">June:</p>
+                            <p class="month">July:</p>
+                            <p class="month">August:</p>
+                            <p class="month">September:</p>
+                            <p class="month">October:</p>
+                            <p class="month">November:</p>
+                            <p class="month">December:</p>
+                        </div>
+                    </div>   
+
+                </div>
+            </div>
+            <!-- <div class="status-box" id="statusBox">
+                <h4>Status</h4>
+                <div id="mondayNames" class="names"></div>
+                <h4 id="toggleReminders">Reminders</h4>
+                <div id="reminders" class="reminders" style="display: flex;">
+                        <canvas id="calendar" width="400" height="300"></canvas>
+
+                    <p>No reminders at the moment.</p>
+                </div>
+            </div> -->
+            <div class="status-box" id="statusBox">
+                
+              
+                <h4>Status</h4>
+                <!-- <div class="export-buttons">
+                    <button id="export-pdf">Export as PDF</button>
+                    <button id="export-email">Email</button>
+                    <button id="export-excel">Export as Excel</button>
+                </div> -->
+                <div class="contain">
+                    <h1>School Attendance Dashboard</h1>
+                    <div class="calendar-container">
+                        <div class="calendar-header">
+                            <button id="prev-button">Previous</button>
+                            <h2 id="month-year"></h2>
+                            <button id="next-button">Next</button>
+                        </div>
+                        <div class="calendar-controls">
+                            <button id="monthly-view-button">Monthly</button>
+                            <button id="weekly-view-button">Weekly</button>
+                        </div>
+                        <div id="calendar"></div>
+                    </div>
+                    <div class="attendance-details">
+                        <h3 id="selected-date">Select a date to view attendance</h3>
+                        <table id="attendance-table">
+                            <thead>
+                                <tr>
+                                    <th>Student ID</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendance-data"></tbody>
+                        </table>
+                    </div>
+                </div>
+        </section>
+    </main>
+   <script type="module" src="/src/index.js"></script>
+</body>
+</html>

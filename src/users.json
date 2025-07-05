@@ -1,9 +1,0 @@
-[
-    {
-        "id": 1,
-        "name": "Admin",
-        "mac_address": "00:00:00:00:00:00",
-        "email": "admin@example.com",
-        "role": "admin"
-    }
-]
