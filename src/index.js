@@ -7,6 +7,9 @@ import {
     showWeeklyView
 } from './module/calendar.js';
 
+import AttendanceSystem from './bundle.js';
+new AttendanceSystem();
+
 document.addEventListener('DOMContentLoaded', () => {
     setupToggles();
     setupMondayNames();
