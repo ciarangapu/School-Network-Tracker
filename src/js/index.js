@@ -6,11 +6,22 @@ import {
     showMonthlyView,
     showWeeklyView
 } from '../module/calendar.js';
+
+import "../styles/landing.css";
+
 import "../styles/admin.css";
 import "../styles/style_copy.css";
 import "../styles/style.css";
 import "../styles/style2.css";
 
+import AttendanceManager from "../module/AttendanceManager.js";
+import DashboardManager from '../module/home.js'; 
+import DataManager from "../module/data.js";
+import QuestionManager from "../module/technical.js";
+
+
+import AttendanceSystem from '../module/bundle.js';
+new AttendanceSystem();
 
 document.addEventListener('DOMContentLoaded', () => {
     setupToggles();
@@ -23,26 +34,28 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('next-button').addEventListener('click', nextPeriod);
 });
 
-// // src/js/index.js
-// import DashboardManager from './dashboardManager.js';
-// import '../../styles/style.css'; // Adjust path to point to styles folder
 
-document.addEventListener('DOMContentLoaded', () => {
-    const path = window.location.pathname;
-    if (path.includes('index.html')) {
-        console.log('Dashboard initialized');
-        new DashboardManager(); // Initialize dashboard only for index.html
-    } else if (path.includes('admin.html')) {
-        console.log('Admin page loaded');
-    } else if (path.includes('indext.html')) {
-        console.log('Indext page loaded');
-    } else if (path.includes('indext2.html')) {
-        console.log('Indext2 page loaded');
-    } else if (path.includes('update.html')) {
-        console.log('Update page loaded');
-    } else if (path.includes('userdashboard.html')) {
-        console.log('User Dashboard page loaded');
-    } else if (path.includes('users.html')) {
-        console.log('Users page loaded');
-    }
-});
+
+const dashboardManager = new DashboardManager();
+const questionManager = new QuestionManager();
+// const attendanceDashboard = new AttendanceDashboard();
+
+
+const dataManager = new DataManager();
+DataManager.prototype.someMethod = function() {
+    console.log('Method called successfully!');
+};
+
+const attendanceManager = new AttendanceManager();
+AttendanceManager.prototype.someMethod = function() {
+    console.log('Method called successfully!');
+};
+
+// // main.js
+// document.addEventListener('DOMContentLoaded', () => {
+//     generateCalendar(); // Initial calendar generation
+//     document.getElementById('prev-button').onclick = prevPeriod;
+//     document.getElementById('next-button').onclick = nextPeriod;
+//     document.getElementById('monthly-view-button').onclick = showMonthlyView;
+//     document.getElementById('weekly-view-button').onclick = showWeeklyView;
+// });

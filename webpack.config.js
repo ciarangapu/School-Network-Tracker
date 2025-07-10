@@ -58,58 +58,138 @@
 
 
 
+
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const glob = require('glob');
 
-const htmlFiles = glob.sync('./public/*.html');
+const htmlFiles = glob.sync('./public/*.html'); // This should include registration.html
 
 const htmlPlugins = htmlFiles.map(file => {
     const filename = path.basename(file);
     return new HtmlWebpackPlugin({
         template: file,
         filename: filename,
-        chunks: ['main']
+        chunks: ['main'],
     });
 });
 
 module.exports = {
-    entry: {
-        main: path.resolve(__dirname, 'src/js/index.js')
-    },
+    entry: './src/js/index.js',
     output: {
-        filename: '[name].bundle.js',
         path: path.resolve(__dirname, 'dist'),
-        publicPath: '/',
-        clean: true
+        filename: 'bundle.[contenthash].js',
+        clean: true,
     },
     module: {
         rules: [
             {
-                test: /\.css$/,
-                use: ['style-loader', 'css-loader']
+                test: /\.js$/,
+                exclude: /node_modules/,
+                use: {
+                    loader: 'babel-loader',
+                    options: {
+                        presets: ['@babel/preset-env'],
+                    },
+                },
             },
             {
-                test: /\.(png|jpg|jpeg|gif|svg)$/,
+                test: /\.css$/,
+                use: ['style-loader', 'css-loader'],
+            },
+            {
+                test: /\.(png|svg|jpg|jpeg|gif)$/i,
                 type: 'asset/resource',
-                generator: {
-                    filename: 'assets/[name][ext]'
-                }
-            }
-        ]
-    },
-    resolve: {
-        extensions: ['.js', '.html', '.css']
+            },
+        ],
     },
     plugins: [
-        ...htmlPlugins
+        ...htmlPlugins, // This should now include registration.html
     ],
     devServer: {
-        static: path.resolve(__dirname, 'dist'),
+        static: {
+            directory: path.join(__dirname, 'public'),
+        },
+        compress: true,
         port: 8080,
+        host: 'localhost',
         open: true,
         hot: true,
-        historyApiFallback: true
+        historyApiFallback: true,
     },
-    mode: 'production' // Matches npm run build
 };
+
+
+
+// const path = require('path');
+// const HtmlWebpackPlugin = require('html-webpack-plugin');
+// const glob = require('glob');
+
+// const htmlFiles = glob.sync('./public/*.html');
+
+// const htmlPlugins = htmlFiles.map(file => {
+//     const filename = path.basename(file);
+//     return new HtmlWebpackPlugin({
+//         template: file,
+//         filename: filename,
+//         chunks: ['main'], // Ensures bundle.js is injected
+//     });
+// });
+
+// // Sort plugins to prioritize landing.html
+// htmlPlugins.sort((a, b) => {
+//     if (a.options.filename === 'landing.html') return -1;
+//     if (b.options.filename === 'landing.html') return 1;
+//     return 0;
+// });
+
+// module.exports = {
+//     entry: path.resolve(__dirname, 'src/js/index.js'),
+//     output: {
+//         path: path.resolve(__dirname, 'dist'),
+//         filename: 'bundle.[contenthash].js',
+//         clean: true,
+//     },
+//     module: {
+//         rules: [
+//             {
+//                 test: /\.js$/,
+//                 exclude: /node_modules/,
+//                 use: {
+//                     loader: 'babel-loader',
+//                     options: {
+//                         presets: ['@babel/preset-env'],
+//                     },
+//                 },
+//             },
+//             {
+//                 test: /\.css$/,
+//                 use: ['style-loader', 'css-loader'],
+//             },
+//             {
+//                 test: /\.(png|svg|jpg|jpeg|gif)$/i,
+//                 type: 'asset/resource',
+//             },
+//         ],
+//     },
+//     plugins: [
+//         ...htmlPlugins,
+//     ],
+//     devServer: {
+//         static: {
+//             directory: path.join(__dirname, 'dist'), // Serve from dist after build
+//         },
+//         compress: true,
+//         port: 8080,
+//         host: 'localhost',
+//         open: true, // Opens the browser automatically
+//         hot: true,
+//         historyApiFallback: true, // Allows navigation between HTML files
+//         // Redirect to landing.html by default
+//         onBeforeSetupMiddleware(devServer) {
+//             devServer.app.get('/', (req, res) => {
+//                 res.redirect('/landing.html');
+//             });
+//         },
+//     },
+// };

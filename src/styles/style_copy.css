@@ -1,98 +1,154 @@
 * {
-    padding: 0;
-    margin: 0;
-    box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 .logo {
-    margin: 13px;
-    background-color: #ffcd33;
-    width: 95%;
-    height: 90px;
-    padding-top: 18px;
-    box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
-    border-radius: 0.9rem;
-    text-align: center; /* Center the logo */
+  margin: 13px;
+  background-color: #ffcd33;
+ max-width: 98%;
+  height: 90px;
+  padding-top: 18px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
+  border-radius: 0.9rem;
 }
 
 .content {
-    display: flex;
-    margin: 10px;
-    background-color: #ffcd33;
-    width: 95%; 
-    border-radius: 0.5rem;
-    height: auto; 
+  display: flex;
+  margin: 10px;
+  background-color: #ffcd33;
+  max-width: 20%;
+  border-radius: 0.5rem;
+  height: 750px;
+  cursor: all-scroll;
+flex-grow: 500px;
 }
 
+footer p{
+    padding: 3px 20px;
+  background-color: white;
+  width: 240px;
+  margin-top: -10px;
+  margin-left: 20px;
+}
+
+/*home-section*/
+.home-title{
+  color: black;
+  margin-left: 30.5px;
+  font-weight: 900;
+  font-size: 40px;
+  padding: 20px;
+  cursor: pointer;
+}
+.home{
+  display: none;
+}
+
+/* attendance section */
 .attendance-title {
-    color: black;
-    margin-left: 20px;
-    font-weight: 900;
-    font-size: 40px;
-    padding: 20px;
-    cursor: pointer;
-}
-
-.attendance {
-    display: none; 
-    margin-top: 10px;
-    background-color: #fff; /* Background for attendance section */
-    border-radius: 0.5rem; /* Rounded corners */
-    padding: 10px; /* Padding for better spacing */
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+  color: black;
+  margin-left: 20px;
+  font-weight: 900;
+  font-size: 40px;
+  padding: 20px;
+  cursor: pointer;
 }
 
 h4 {
-    font-size: 25px;
-    margin-bottom: 10px; /* Spacing below headings */
+  font-size: 25px;
 }
 
-.day, .week, .month {
-    margin: 5px 0;
-    font-size: 20px;
-    margin-left: 15px;
-    cursor: pointer;
-    color: #333; /* Darker text color for better readability */
+.days, .week, .month {
+  margin: 5px 0;
+  font-size: 20px;
+  margin-left: 15px;
+  cursor: pointer;
+  
 }
-
-.make, .many, .menu {
-    cursor: pointer;
+.make, .many, .menu{
+cursor: pointer;
 }
-
 .status-box {
-    border: 2px solid #cfc8c8;
-    padding: 7px;
-    border-radius: 10px;
-    flex: 1; 
-    margin-left: 10px;
-    max-width: 85%; 
-    color: black; 
-    background-color: #fff; 
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2); 
+  border: 2px solid #cfc8c8;
+  padding: 10px;
+  border-radius: 10px;
+  flex: 1;
+  margin-left: 20px; 
+ min-width: 389%;
+  color: black; 
 }
 
-footer p {
-    margin: 15px;
-    padding: 3px 15px;
-    background-color: black;
-    color: white; 
-    width: auto;
-    border-radius: 3px;
-    margin-left: 20px;
-    margin-bottom: 20px;
+footer p{
+  padding: 3px 20px;
+  background-color: white;
+  width: 240px;
+  margin-top: -10px;
+  margin-left: 20px;
 }
 
-h1 {
+/*data-section*/
+.data-title{
+  color: black;
+  margin-left: 60.5px;
+  font-weight: 900;
+  font-size: 40px;
+  padding: 20px;
+  cursor: pointer;
+}
+ .data{
+  display: none;
+ }
+
+
+/* question section */
+.question-title{
+  color: black;
+  margin-left: 10.5px;
+  font-weight: 900;
+  font-size: 40px;
+  padding: 20px;
+  cursor: pointer;
+}
+.question {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 20px;
+  padding: 20px;
+  display: none;
+  cursor: pointer;
+}
+
+.question-item {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  padding: 15px;
   text-align: center;
-  color: #333;
+  transition: transform 0.2s;
+}
+.question-item p{
+  font-size: 21px;
+}
+.question-item:hover {
+  transform: translateY(-5px);
+}
+
+
+/*calender section*/
+.contain{
+  display: none;
 }
 
 .calendar-container {
+  margin: 30px;
   background-color: #fff;
   padding: 20px;
   border-radius: 8px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
+  
 }
 
 .calendar-header {
@@ -116,8 +172,7 @@ h1 {
   padding: 10px;
   text-align: center;
   border: 1px solid #ddd;
-  /* background-color: #fff; */
-  cursor: pointer;
+    cursor: pointer;
  font-size: 20px;
 }
 
@@ -126,7 +181,7 @@ h1 {
 }
 
 .day.header {
-  background-color: #007bff;
+  background-color: #ffcd33;
   color: #fff;
   font-weight: bold;
 }
@@ -136,7 +191,7 @@ h1 {
 }
 
 .day.selected {
-  background-color: #007bff;
+  background-color: #ffcd33;
   color: #fff;
 }
 
@@ -159,27 +214,26 @@ th, td {
 }
 
 th {
-  background-color: #007bff;
+  background-color: #ffcd33;
   color: #fff;
 }
 
 button {
   padding: 10px 15px;
   border: none;
-  background-color: #007bff;
+  background-color: #ffcd33;
   color: #fff;
   border-radius: 5px;
   cursor: pointer;
 }
 
 button:hover {
-  background-color: #0056b3;
+  background-color: #0056b3;
 }
 
-
 .export-buttons {
-  margin-bottom: 20px;
-  margin-left: 600px;
+  margin-bottom: 0px;
+  margin-left: 680px;
 }
 
 .export-buttons button {
@@ -194,4 +248,55 @@ button:hover {
 
 .export-buttons button:hover {
   background-color: #45a049; /* Darker green */
+}
+.date{
+  margin: 20px;
+  margin-top: -30px;
+  margin-left: 700px;
+}
+
+/*card section*/
+
+.containers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 20px;
+  padding: 20px;
+  display: none;
+  cursor: pointer;
+}
+
+.containers h3{
+  font-size: 25px;
+}
+
+.containers p{
+  font-size: 25px;
+}
+
+.card {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  padding: 15px;
+  text-align: center;
+  transition: transform 0.2s;
+}
+.card:hover {
+  transform: translateY(-5px);
+}
+
+/*home section*/
+.monitor-title{
+  color: black;
+  margin-left: 50.5px;
+  font-weight: 900;
+  font-size: 40px;
+  padding: 20px;
+  cursor: pointer;
+  
+}
+.define{
+  font-size: 40px;
+  display: none;
 }
