@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import ApiService from '../services/api';
 
 interface User {
   id: string;
@@ -42,38 +43,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (credentials: any, userType: 'admin' | 'student'): Promise<boolean> => {
     try {
-      // Simulate API call
-      if (userType === 'admin') {
-        // Mock admin login
-        if (credentials.email === 'admin@example.com' && credentials.password === 'admin123') {
-          const adminUser: User = {
-            id: '1',
-            name: 'Admin User',
-            email: credentials.email,
-            role: 'admin'
-          };
-          setUser(adminUser);
+      // Try API first, fallback to mock authentication if server is not running
+      try {
+        const response = await ApiService.login(credentials, userType);
+        if (response.success) {
+          setUser(response.user);
           setIsAuthenticated(true);
-          localStorage.setItem('user', JSON.stringify(adminUser));
+          localStorage.setItem('user', JSON.stringify(response.user));
           return true;
         }
-      } else {
-        // Mock student login with MAC address
-        if (isValidMacAddress(credentials.macAddress)) {
-          const studentUser: User = {
-            id: '2',
-            name: 'Student User',
-            macAddress: credentials.macAddress,
-            course: 'Full Stack Development',
-            role: 'student'
-          };
-          setUser(studentUser);
-          setIsAuthenticated(true);
-          localStorage.setItem('user', JSON.stringify(studentUser));
-          return true;
+        return false;
+      } catch (apiError) {
+        console.log('API not available, using mock authentication');
+        
+        // Mock authentication fallback
+        if (userType === 'admin') {
+          if (credentials.email === 'admin@example.com' && credentials.password === 'admin123') {
+            const mockUser = {
+              id: 'admin',
+              name: 'Admin User',
+              email: credentials.email,
+              role: 'admin' as const
+            };
+            setUser(mockUser);
+            setIsAuthenticated(true);
+            localStorage.setItem('user', JSON.stringify(mockUser));
+            return true;
+          }
+        } else {
+          // Student login with MAC address
+          if (credentials.macAddress && isValidMacAddress(credentials.macAddress)) {
+            const mockUser = {
+              id: 'student-' + Date.now(),
+              name: 'Student User',
+              macAddress: credentials.macAddress,
+              course: 'Full Stack Development',
+              role: 'student' as const
+            };
+            setUser(mockUser);
+            setIsAuthenticated(true);
+            localStorage.setItem('user', JSON.stringify(mockUser));
+            return true;
+          }
         }
+        return false;
       }
-      return false;
     } catch (error) {
       console.error('Login error:', error);
       return false;
@@ -88,11 +102,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (userData: any): Promise<boolean> => {
     try {
-      // Simulate API call for student registration
-      if (userData.name && isValidMacAddress(userData.macAddress) && userData.course) {
-        return true;
+      try {
+        const response = await ApiService.register(userData);
+        if (response.success) {
+          return true;
+        }
+        return false;
+      } catch (apiError) {
+        console.log('API not available, using mock registration');
+        // Mock registration - just validate the data
+        if (userData.name && userData.macAddress && userData.course && isValidMacAddress(userData.macAddress)) {
+          return true;
+        }
+        return false;
       }
-      return false;
     } catch (error) {
       console.error('Registration error:', error);
       return false;

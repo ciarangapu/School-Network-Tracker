@@ -1,0 +1,20 @@
+{
+  "name": "mac_scrapper",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "",
+  "main": "scraper.js",
+  "scripts": {
+    "start": "node scraper.js",
+    "dev": "node scraper.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.10.0",
+    "axios-cookiejar-support": "^6.0.2",
+    "puppeteer": "^24.10.1",
+    "tough-cookie": "^5.1.2"
+  }
+}
