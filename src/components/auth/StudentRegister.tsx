@@ -129,6 +129,26 @@ const StudentRegister = () => {
             </div>
 
             <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.email ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Enter your email address"
+              />
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+              )}
+            </div>
+
+            <div>
               <label htmlFor="macAddress" className="block text-sm font-medium text-gray-700 mb-2">
                 <div className="flex items-center">
                   <Wifi className="h-4 w-4 mr-2" />
