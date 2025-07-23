@@ -1,45 +1,90 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, UserCheck, Clock, TrendingUp, Calendar, AlertTriangle } from 'lucide-react';
+import ApiService from '../../services/api';
 
 const Overview = () => {
-  const stats = [
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    currentPresent: 0,
+    currentAbsent: 0,
+    lastUpdate: null
+  });
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      const [summaryData, snapshotsData] = await Promise.all([
+        ApiService.getAttendanceSummary(),
+        ApiService.getAttendanceSnapshots({ limit: 5 })
+      ]);
+      
+      setStats(summaryData);
+      
+      // Convert snapshots to activity format
+      const activities = snapshotsData.map((snapshot, index) => ({
+        time: new Date(snapshot.timestamp).toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }),
+        event: `Attendance snapshot: ${snapshot.totalPresent} present, ${snapshot.totalAbsent} absent`,
+        type: 'system'
+      }));
+      
+      setRecentActivity(activities);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const dashboardStats = [
     {
       name: 'Total Students',
-      value: '124',
-      change: '+12%',
-      changeType: 'increase',
+      value: stats.totalStudents.toString(),
+      change: 'Active students',
+      changeType: 'neutral',
       icon: Users
     },
     {
-      name: 'Present Today',
-      value: '98',
-      change: '+5%',
+      name: 'Present Now',
+      value: stats.currentPresent.toString(),
+      change: 'Currently present',
       changeType: 'increase',
       icon: UserCheck
     },
     {
-      name: 'Attendance Rate',
-      value: '89.2%',
-      change: '+2.1%',
-      changeType: 'increase',
-      icon: TrendingUp
+      name: 'Absent Now',
+      value: stats.currentAbsent.toString(),
+      change: 'Currently absent',
+      changeType: 'neutral',
+      icon: Clock
     },
     {
-      name: 'Late Arrivals',
-      value: '6',
-      change: '-15%',
-      changeType: 'decrease',
-      icon: Clock
+      name: 'Total Snapshots',
+      value: stats.totalSnapshots?.toString() || '0',
+      change: 'Recorded today',
+      changeType: 'neutral',
+      icon: TrendingUp
     }
   ];
 
-  const recentActivity = [
-    { time: '10:30 AM', event: 'John Doe marked present', type: 'checkin' },
-    { time: '10:25 AM', event: 'Sarah Wilson marked present', type: 'checkin' },
-    { time: '10:20 AM', event: 'Mike Johnson marked present', type: 'checkin' },
-    { time: '10:15 AM', event: 'Daily attendance snapshot taken', type: 'system' },
-    { time: '10:10 AM', event: 'Emma Davis marked present', type: 'checkin' }
-  ];
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -53,7 +98,7 @@ const Overview = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
+        {dashboardStats.map((stat) => (
           <div key={stat.name} className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
@@ -66,11 +111,10 @@ const Overview = () => {
             </div>
             <div className="mt-4 flex items-center">
               <span className={`text-sm font-medium ${
-                stat.changeType === 'increase' ? 'text-green-600' : 'text-red-600'
+                stat.changeType === 'increase' ? 'text-green-600' : 'text-gray-500'
               }`}>
                 {stat.change}
               </span>
-              <span className="text-sm text-gray-500 ml-2">from last week</span>
             </div>
           </div>
         ))}
@@ -85,7 +129,7 @@ const Overview = () => {
           <div className="p-6">
             <div className="flow-root">
               <ul className="-mb-8">
-                {recentActivity.map((activity, index) => (
+                {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
                   <li key={index}>
                     <div className="relative pb-8">
                       {index !== recentActivity.length - 1 && (
@@ -112,7 +156,11 @@ const Overview = () => {
                       </div>
                     </div>
                   </li>
-                ))}
+                )) : (
+                  <li className="text-center py-8 text-gray-500">
+                    No recent activity found
+                  </li>
+                )}
               </ul>
             </div>
           </div>

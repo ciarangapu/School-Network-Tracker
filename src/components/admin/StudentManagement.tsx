@@ -1,39 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, Users, Mail, Download } from 'lucide-react';
+import ApiService from '../../services/api';
 
 const StudentManagement = () => {
-  const [students, setStudents] = useState([
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john.doe@example.com',
-      macAddress: '00:11:22:33:44:55',
-      course: 'Full Stack Development',
-      joinDate: '2024-01-15',
-      status: 'Active',
-      attendanceRate: 92.5
-    },
-    {
-      id: 2,
-      name: 'Sarah Wilson',
-      email: 'sarah.wilson@example.com',
-      macAddress: '00:11:22:33:44:56',
-      course: 'IT Networking',
-      joinDate: '2024-01-10',
-      status: 'Active',
-      attendanceRate: 88.7
-    },
-    {
-      id: 3,
-      name: 'Mike Johnson',
-      email: 'mike.johnson@example.com',
-      macAddress: '00:11:22:33:44:57',
-      course: 'DevOps',
-      joinDate: '2024-01-20',
-      status: 'Active',
-      attendanceRate: 76.3
-    }
-  ]);
+  const [students, setStudents] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('all');
@@ -58,6 +29,27 @@ const StudentManagement = () => {
     status: 'Active'
   });
 
+  useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  const fetchStudents = async () => {
+    try {
+      setIsLoading(true);
+      const studentsData = await ApiService.getStudents();
+      setStudents(studentsData.map(student => ({
+        ...student,
+        id: student._id,
+        joinDate: student.createdAt ? new Date(student.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        attendanceRate: 0 // Will be calculated from attendance data
+      })));
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -68,21 +60,31 @@ const StudentManagement = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingStudent) {
-      setStudents(students.map(student => 
-        student.id === editingStudent.id 
-          ? { ...student, ...formData }
-          : student
-      ));
-    } else {
-      setStudents([...students, { 
-        ...formData, 
-        id: Date.now(),
-        joinDate: new Date().toISOString().split('T')[0],
-        attendanceRate: 0
-      }]);
+    handleSaveStudent();
+  };
+
+  const handleSaveStudent = async () => {
+    try {
+      if (editingStudent) {
+        // Update existing student (you'll need to implement this API endpoint)
+        console.log('Update student:', formData);
+        // For now, just update locally
+        setStudents(students.map(student => 
+          student.id === editingStudent.id 
+            ? { ...student, ...formData }
+            : student
+        ));
+      } else {
+        // Create new student
+        const response = await ApiService.register(formData);
+        if (response.success) {
+          await fetchStudents(); // Refresh the list
+        }
+      }
+      resetForm();
+    } catch (error) {
+      console.error('Error saving student:', error);
     }
-    resetForm();
   };
 
   const resetForm = () => {
@@ -110,6 +112,8 @@ const StudentManagement = () => {
   };
 
   const deleteStudent = (id: number) => {
+    // Implement delete API call
+    console.log('Delete student:', id);
     setStudents(students.filter(student => student.id !== id));
   };
 
@@ -126,6 +130,13 @@ const StudentManagement = () => {
 
   return (
     <div className="space-y-6">
+      {isLoading && (
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-2 text-gray-600">Loading students...</span>
+        </div>
+      )}
+      
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Student Management</h1>
         <button
@@ -233,7 +244,7 @@ const StudentManagement = () => {
                     {student.course}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(student.joinDate).toLocaleDateString()}
+                    {student.createdAt ? new Date(student.createdAt).toLocaleDateString() : 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(student.status)}`}>
@@ -241,7 +252,7 @@ const StudentManagement = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {student.attendanceRate}%
+                    {student.attendanceRate || 0}%
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">

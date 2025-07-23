@@ -51,7 +51,7 @@ const Login = () => {
       if (!formData.macAddress) {
         newErrors.macAddress = 'MAC address is required';
       } else if (!/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(formData.macAddress)) {
-        newErrors.macAddress = 'Please enter a valid MAC address (e.g., 00:11:22:33:44:55)';
+        newErrors.macAddress = 'Please enter a valid MAC address (e.g., 00:11:22:33:44:55 or 00-11-22-33-44-55)';
       }
     }
     
@@ -74,7 +74,7 @@ const Login = () => {
         setErrors({
           general: userType === 'admin' 
             ? 'Invalid email or password' 
-            : 'MAC address not found or not registered'
+            : 'MAC address not found. Please check your MAC address or register first.'
         });
       }
     } catch (error) {
@@ -213,7 +213,8 @@ const Login = () => {
                   <p className="mt-1 text-sm text-red-600">{errors.macAddress}</p>
                 )}
                 <p className="mt-1 text-xs text-gray-500">
-                  Enter your device's MAC address to access your attendance records
+                  Enter your device's MAC address to access your attendance records. 
+                  You can use either format: 00:11:22:33:44:55 or 00-11-22-33-44-55
                 </p>
               </div>
             )}

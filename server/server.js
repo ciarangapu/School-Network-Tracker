@@ -292,9 +292,14 @@ app.post('/api/auth/login', async (req, res) => {
     } else {
       // Student login with MAC address
       if (useDatabase) {
-        const student = await Student.findOne({ 
-          macAddress: { $regex: new RegExp(macAddress.replace(/[:-]/g, ''), 'i') },
-          status: 'Active'
+        // Normalize the input MAC address by removing all separators
+        const normalizedInputMac = macAddress.replace(/[:-]/g, '').toLowerCase();
+        
+        // Find student by comparing normalized MAC addresses
+        const students = await Student.find({ status: 'Active' });
+        const student = students.find(s => {
+          const normalizedStoredMac = s.macAddress.replace(/[:-]/g, '').toLowerCase();
+          return normalizedStoredMac === normalizedInputMac;
         });
 
         if (!student) {

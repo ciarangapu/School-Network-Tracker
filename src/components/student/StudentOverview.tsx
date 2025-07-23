@@ -1,51 +1,95 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, TrendingUp, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import ApiService from '../../services/api';
 
 const StudentOverview = () => {
+  const { user } = useAuth();
+  const [attendanceStats, setAttendanceStats] = useState({
+    attendanceRate: 0,
+    presentDays: 0,
+    lateDays: 0,
+    absentDays: 0
+  });
+  const [recentAttendance, setRecentAttendance] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const currentDate = new Date();
   const currentMonth = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   
+  useEffect(() => {
+    if (user?.id) {
+      fetchStudentData();
+    }
+  }, [user]);
+
+  const fetchStudentData = async () => {
+    try {
+      setIsLoading(true);
+      const [summaryData, snapshotsData] = await Promise.all([
+        ApiService.getAttendanceSummary({ studentId: user.id }),
+        ApiService.getAttendanceSnapshots({ studentId: user.id, limit: 5 })
+      ]);
+      
+      setAttendanceStats({
+        attendanceRate: summaryData.attendanceRate || 0,
+        presentDays: summaryData.presentCount || 0,
+        lateDays: 0, // Calculate from snapshots if needed
+        absentDays: summaryData.absentCount || 0
+      });
+
+      // Convert snapshots to recent attendance format
+      const recentData = snapshotsData.map(snapshot => ({
+        date: snapshot.timestamp,
+        status: snapshot.isPresent ? 'Present' : 'Absent',
+        time: snapshot.isPresent ? new Date(snapshot.timestamp).toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }) : '-',
+        color: snapshot.isPresent ? 'green' : 'red'
+      }));
+      
+      setRecentAttendance(recentData);
+    } catch (error) {
+      console.error('Error fetching student data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const stats = [
     {
       name: 'Attendance Rate',
-      value: '92.5%',
-      change: '+2.1%',
-      changeType: 'increase',
+      value: `${attendanceStats.attendanceRate}%`,
+      change: 'Overall rate',
+      changeType: 'neutral',
       icon: TrendingUp,
       color: 'green'
     },
     {
       name: 'Present Days',
-      value: '18',
-      change: 'This month',
+      value: attendanceStats.presentDays.toString(),
+      change: 'Total present',
       changeType: 'neutral',
       icon: CheckCircle,
       color: 'green'
     },
     {
       name: 'Late Arrivals',
-      value: '3',
-      change: 'This month',
+      value: attendanceStats.lateDays.toString(),
+      change: 'Total late',
       changeType: 'neutral',
       icon: Clock,
       color: 'yellow'
     },
     {
       name: 'Absent Days',
-      value: '2',
-      change: 'This month',
+      value: attendanceStats.absentDays.toString(),
+      change: 'Total absent',
       changeType: 'neutral',
       icon: XCircle,
       color: 'red'
     }
-  ];
-
-  const recentAttendance = [
-    { date: '2024-01-15', status: 'Present', time: '09:15', color: 'green' },
-    { date: '2024-01-14', status: 'Present', time: '09:05', color: 'green' },
-    { date: '2024-01-13', status: 'Late', time: '09:35', color: 'yellow' },
-    { date: '2024-01-12', status: 'Present', time: '08:55', color: 'green' },
-    { date: '2024-01-11', status: 'Absent', time: '-', color: 'red' }
   ];
 
   const upcomingEvents = [
@@ -53,6 +97,17 @@ const StudentOverview = () => {
     { date: '2024-01-20', event: 'Quiz - JavaScript Fundamentals', time: '02:00 PM' },
     { date: '2024-01-22', event: 'Group Assignment Due', time: '11:59 PM' }
   ];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading your attendance data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -104,7 +159,7 @@ const StudentOverview = () => {
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              {recentAttendance.map((record, index) => (
+              {recentAttendance.length > 0 ? recentAttendance.map((record, index) => (
                 <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
                   <div className="flex items-center space-x-3">
                     <div className={`w-3 h-3 rounded-full ${
@@ -130,7 +185,11 @@ const StudentOverview = () => {
                     {record.status}
                   </span>
                 </div>
-              ))}
+              )) : (
+                <div className="text-center py-8 text-gray-500">
+                  No attendance records found
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,23 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Download, Mail, Search, Filter, TrendingUp, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import ApiService from '../../services/api';
 
 const StudentAttendance = () => {
+  const { user } = useAuth();
   const [dateRange, setDateRange] = useState({
     start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
   const [viewType, setViewType] = useState('daily');
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const attendanceData = [
-    { date: '2024-01-15', status: 'Present', checkIn: '09:15', checkOut: '17:30', duration: '8h 15m' },
-    { date: '2024-01-14', status: 'Present', checkIn: '09:05', checkOut: '17:45', duration: '8h 40m' },
-    { date: '2024-01-13', status: 'Late', checkIn: '09:35', checkOut: '17:30', duration: '7h 55m' },
-    { date: '2024-01-12', status: 'Present', checkIn: '08:55', checkOut: '17:25', duration: '8h 30m' },
-    { date: '2024-01-11', status: 'Absent', checkIn: '-', checkOut: '-', duration: '0h 0m' },
-    { date: '2024-01-10', status: 'Present', checkIn: '09:10', checkOut: '17:35', duration: '8h 25m' },
-    { date: '2024-01-09', status: 'Present', checkIn: '09:02', checkOut: '17:28', duration: '8h 26m' },
-    { date: '2024-01-08', status: 'Present', checkIn: '09:18', checkOut: '17:32', duration: '8h 14m' }
-  ];
+  useEffect(() => {
+    if (user?.id) {
+      fetchAttendanceData();
+    }
+  }, [user, dateRange]);
+
+  const fetchAttendanceData = async () => {
+    try {
+      setIsLoading(true);
+      const snapshotsData = await ApiService.getAttendanceSnapshots({
+        studentId: user.id,
+        startDate: dateRange.start,
+        endDate: dateRange.end,
+        limit: 100
+      });
+      
+      // Convert snapshots to attendance records
+      const records = snapshotsData.map(snapshot => ({
+        date: snapshot.timestamp,
+        status: snapshot.isPresent ? 'Present' : 'Absent',
+        checkIn: snapshot.isPresent ? new Date(snapshot.timestamp).toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }) : '-',
+        checkOut: '-', // Not tracked in current system
+        duration: snapshot.isPresent ? '8h 0m' : '0h 0m' // Estimated
+      }));
+      
+      setAttendanceData(records);
+    } catch (error) {
+      console.error('Error fetching attendance data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -61,6 +91,13 @@ const StudentAttendance = () => {
 
   return (
     <div className="space-y-6">
+      {isLoading && (
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-2 text-gray-600">Loading attendance data...</span>
+        </div>
+      )}
+      
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">My Attendance</h1>
         <div className="flex items-center space-x-3">
@@ -228,6 +265,15 @@ const StudentAttendance = () => {
                 </tr>
               ))}
             </tbody>
+            {attendanceData.length === 0 && !isLoading && (
+              <tbody>
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                    No attendance records found for the selected period
+                  </td>
+                </tr>
+              </tbody>
+            )}
           </table>
         </div>
       </div>

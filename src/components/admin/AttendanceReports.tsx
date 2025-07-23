@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Download, Mail, Filter, Search, TrendingUp, TrendingDown } from 'lucide-react';
+import ApiService from '../../services/api';
 
 const AttendanceReports = () => {
   const [dateRange, setDateRange] = useState({
@@ -8,6 +9,14 @@ const AttendanceReports = () => {
   });
   const [viewType, setViewType] = useState('daily');
   const [selectedCourse, setSelectedCourse] = useState('all');
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [summaryStats, setSummaryStats] = useState({
+    totalStudents: 0,
+    currentPresent: 0,
+    currentAbsent: 0,
+    lateCount: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
   const courses = [
     'All Courses',
@@ -19,58 +28,57 @@ const AttendanceReports = () => {
     'Intern'
   ];
 
-  const attendanceData = [
-    {
-      id: 1,
-      name: 'John Doe',
-      course: 'Full Stack Development',
-      macAddress: '00:11:22:33:44:55',
-      status: 'Present',
-      checkInTime: '09:15',
-      attendanceRate: 92.5,
-      trend: 'up'
-    },
-    {
-      id: 2,
-      name: 'Sarah Wilson',
-      course: 'IT Networking',
-      macAddress: '00:11:22:33:44:56',
-      status: 'Present',
-      checkInTime: '09:05',
-      attendanceRate: 88.7,
-      trend: 'down'
-    },
-    {
-      id: 3,
-      name: 'Mike Johnson',
-      course: 'DevOps',
-      macAddress: '00:11:22:33:44:57',
-      status: 'Late',
-      checkInTime: '09:35',
-      attendanceRate: 76.3,
-      trend: 'down'
-    },
-    {
-      id: 4,
-      name: 'Emma Davis',
-      course: 'Digital Marketing',
-      macAddress: '00:11:22:33:44:58',
-      status: 'Absent',
-      checkInTime: '-',
-      attendanceRate: 95.1,
-      trend: 'up'
-    },
-    {
-      id: 5,
-      name: 'Alex Brown',
-      course: 'Cloud Computing',
-      macAddress: '00:11:22:33:44:59',
-      status: 'Present',
-      checkInTime: '08:55',
-      attendanceRate: 89.2,
-      trend: 'up'
+  useEffect(() => {
+    fetchAttendanceData();
+  }, [dateRange, selectedCourse]);
+
+  const fetchAttendanceData = async () => {
+    try {
+      setIsLoading(true);
+      const [snapshotsData, summaryData, studentsData] = await Promise.all([
+        ApiService.getAttendanceSnapshots({
+          startDate: dateRange.start,
+          endDate: dateRange.end,
+          limit: 50
+        }),
+        ApiService.getAttendanceSummary({
+          startDate: dateRange.start,
+          endDate: dateRange.end
+        }),
+        ApiService.getStudents()
+      ]);
+
+      setSummaryStats(summaryData);
+
+      // Get latest snapshot for current status
+      const latestSnapshot = snapshotsData[0];
+      if (latestSnapshot) {
+        const reportData = studentsData.map(student => {
+          const isPresent = latestSnapshot.presentStudents.some(p => p.studentId === student._id);
+          const isAbsent = latestSnapshot.absentStudents.some(a => a.studentId === student._id);
+          
+          return {
+            id: student._id,
+            name: student.name,
+            course: student.course,
+            macAddress: student.macAddress,
+            status: isPresent ? 'Present' : (isAbsent ? 'Absent' : 'Unknown'),
+            checkInTime: isPresent ? new Date(latestSnapshot.timestamp).toLocaleTimeString('en-US', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }) : '-',
+            attendanceRate: 0, // Calculate from historical data
+            trend: 'neutral'
+          };
+        });
+        setAttendanceData(reportData);
+      }
+    } catch (error) {
+      console.error('Error fetching attendance data:', error);
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -95,6 +103,13 @@ const AttendanceReports = () => {
 
   return (
     <div className="space-y-6">
+      {isLoading && (
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-2 text-gray-600">Loading attendance data...</span>
+        </div>
+      )}
+      
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Attendance Reports</h1>
         <div className="flex items-center space-x-3">
@@ -172,7 +187,7 @@ const AttendanceReports = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Students</p>
-              <p className="text-2xl font-bold text-gray-900">124</p>
+              <p className="text-2xl font-bold text-gray-900">{summaryStats.totalStudents}</p>
             </div>
             <div className="bg-blue-100 p-3 rounded-full">
               <Calendar className="h-6 w-6 text-blue-600" />
@@ -184,7 +199,7 @@ const AttendanceReports = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Present</p>
-              <p className="text-2xl font-bold text-green-600">98</p>
+              <p className="text-2xl font-bold text-green-600">{summaryStats.currentPresent}</p>
             </div>
             <div className="bg-green-100 p-3 rounded-full">
               <TrendingUp className="h-6 w-6 text-green-600" />
@@ -196,7 +211,7 @@ const AttendanceReports = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Late</p>
-              <p className="text-2xl font-bold text-yellow-600">8</p>
+              <p className="text-2xl font-bold text-yellow-600">{summaryStats.lateCount || 0}</p>
             </div>
             <div className="bg-yellow-100 p-3 rounded-full">
               <Calendar className="h-6 w-6 text-yellow-600" />
@@ -208,7 +223,7 @@ const AttendanceReports = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Absent</p>
-              <p className="text-2xl font-bold text-red-600">18</p>
+              <p className="text-2xl font-bold text-red-600">{summaryStats.currentAbsent}</p>
             </div>
             <div className="bg-red-100 p-3 rounded-full">
               <TrendingDown className="h-6 w-6 text-red-600" />
@@ -267,7 +282,7 @@ const AttendanceReports = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {attendanceData.map((student) => (
+              {attendanceData.length > 0 ? attendanceData.map((student) => (
                 <tr key={student.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -322,7 +337,13 @@ const AttendanceReports = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    No attendance data found for the selected period
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
