@@ -56,6 +56,46 @@ const settingsSchema = new mongoose.Schema({
     default: 30,
     min: 1,
     max: 480
+  },
+  emailConfig: {
+    host: {
+      type: String,
+      default: 'smtp.gmail.com'
+    },
+    port: {
+      type: Number,
+      default: 587
+    },
+    secure: {
+      type: Boolean,
+      default: false
+    },
+    user: {
+      type: String,
+      default: ''
+    },
+    password: {
+      type: String,
+      default: ''
+    },
+    from: {
+      type: String,
+      default: 'noreply@schooltracker.com'
+    }
+  },
+  pdfSettings: {
+    includeCharts: {
+      type: Boolean,
+      default: true
+    },
+    includeDetails: {
+      type: Boolean,
+      default: true
+    },
+    logoUrl: {
+      type: String,
+      default: ''
+    }
   }
 }, {
   timestamps: true

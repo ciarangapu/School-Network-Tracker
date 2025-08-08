@@ -5,6 +5,9 @@ import ApiService from '../../services/api';
 const StudentManagement = () => {
   const [students, setStudents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [emailAddress, setEmailAddress] = useState('');
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('all');
@@ -117,6 +120,45 @@ const StudentManagement = () => {
     setStudents(students.filter(student => student.id !== id));
   };
 
+  // Handle Email All Students
+  const handleEmailAll = () => {
+    setEmailAddress('');
+    setShowEmailDialog(true);
+  };
+
+  // Handle Export All Students as PDF
+  const handleExportAll = async () => {
+    try {
+      setIsProcessing(true);
+      await ApiService.downloadStudentListPDF();
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      alert('Failed to export PDF. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle Email Submit
+  const handleEmailSubmit = async () => {
+    if (!emailAddress.trim()) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      await ApiService.sendStudentListEmail(emailAddress);
+      alert('Student list sent successfully!');
+      setShowEmailDialog(false);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      alert('Failed to send email. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Active':
@@ -175,13 +217,21 @@ const StudentManagement = () => {
             </select>
           </div>
           <div className="flex items-center space-x-2">
-            <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+            <button 
+              onClick={handleEmailAll}
+              disabled={isProcessing}
+              className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            >
               <Mail className="h-4 w-4" />
-              <span>Email All</span>
+              <span>{isProcessing ? 'Processing...' : 'Email All'}</span>
             </button>
-            <button className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+            <button 
+              onClick={handleExportAll}
+              disabled={isProcessing}
+              className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            >
               <Download className="h-4 w-4" />
-              <span>Export</span>
+              <span>{isProcessing ? 'Exporting...' : 'Export'}</span>
             </button>
           </div>
         </div>
@@ -370,6 +420,46 @@ const StudentManagement = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Email All Dialog */}
+      {showEmailDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Email All Students Report</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={emailAddress}
+                onChange={(e) => setEmailAddress(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter email address"
+              />
+            </div>
+            <div className="mb-4 text-sm text-gray-600">
+              This will send a comprehensive report including all student information and attendance data.
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowEmailDialog(false)}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                disabled={isProcessing}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEmailSubmit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                disabled={isProcessing}
+              >
+                {isProcessing ? 'Sending...' : 'Send Email'}
+              </button>
+            </div>
           </div>
         </div>
       )}

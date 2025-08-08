@@ -3,7 +3,19 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import MacScraper from '../scraper/scraper.js';
+import emailService from './services/emailService.js';
+import pdfService from './services/pdfService.js';
+
+// Try to import scraper, but don't fail if dependencies are not available
+let MacScraper;
+try {
+  const scraperModule = await import('../scraper/scraper.js');
+  MacScraper = scraperModule.default;
+  console.log('✅ Scraper module loaded successfully');
+} catch (error) {
+  console.log('⚠️ Scraper not available, using mock data');
+  MacScraper = null;
+}
 
 // Try to import database config, but don't fail if MongoDB is not available
 let connectDB, seedAdmin, Student, AttendanceSnapshot, Admin, Settings;
@@ -99,6 +111,9 @@ if (useDatabase) {
 // Initialize scraper (lazy initialization)
 let scraper = null;
 const getScraper = () => {
+  if (!MacScraper) {
+    return null; // Return null if scraper module not available
+  }
   if (!scraper) {
     scraper = new MacScraper();
   }
@@ -631,6 +646,9 @@ app.post('/api/attendance/snapshot', async (req, res) => {
   try {
     console.log('\n🎯 Manual snapshot triggered via API');
     const scraperInstance = getScraper();
+    if (!scraperInstance) {
+      return res.status(503).json({ success: false, error: 'Scraper not available' });
+    }
     const scrapedData = await scraperInstance.scrapeMACs();
     const snapshot = await processScrapedMACs(scrapedData);
     res.json({ success: true, snapshot });
@@ -645,6 +663,9 @@ app.get('/api/scraper/test', async (req, res) => {
   try {
     console.log('\n🧪 Test scraper endpoint called');
     const scraperInstance = getScraper();
+    if (!scraperInstance) {
+      return res.status(503).json({ success: false, error: 'Scraper not available' });
+    }
     const scrapedData = await scraperInstance.scrapeMACs();
     console.log('\n✅ Test scraping completed successfully');
     res.json({ success: true, data: scrapedData });
@@ -658,6 +679,9 @@ app.get('/api/scraper/test', async (req, res) => {
 app.get('/api/scraper/current', async (req, res) => {
   try {
     const scraperInstance = getScraper();
+    if (!scraperInstance) {
+      return res.status(503).json({ success: false, error: 'Scraper not available' });
+    }
     const scrapedData = await scraperInstance.scrapeMACs();
     res.json(scrapedData);
   } catch (error) {
@@ -739,6 +763,572 @@ app.get('/api/scraper/devices', async (req, res) => {
   }
 });
 
+// Email and PDF Export Endpoints
+
+// Send attendance report via email
+app.post('/api/attendance/email', async (req, res) => {
+  try {
+    const { recipientEmail, studentId, reportType, period } = req.body;
+
+    if (!recipientEmail) {
+      return res.status(400).json({ success: false, message: 'Recipient email is required' });
+    }
+
+    let attendanceData;
+
+    if (reportType === 'individual' && studentId) {
+      // Get individual student data
+      if (useDatabase) {
+        const student = await Student.findById(studentId);
+        if (!student) {
+          return res.status(404).json({ success: false, message: 'Student not found' });
+        }
+
+        // Get attendance snapshots for the student
+        const snapshots = await AttendanceSnapshot.find({
+          $or: [
+            { 'presentStudents.studentId': studentId },
+            { 'absentStudents.studentId': studentId }
+          ]
+        }).sort({ timestamp: -1 }).limit(30);
+
+        const presentDays = snapshots.filter(s => 
+          s.presentStudents.some(p => p.studentId.toString() === studentId)
+        ).length;
+
+        const totalDays = snapshots.length;
+        const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+
+        attendanceData = {
+          studentName: student.name,
+          email: student.email,
+          course: student.course,
+          presentDays,
+          totalDays,
+          attendanceRate,
+          period: period || 'Last 30 days',
+          attendanceRecords: snapshots.map(s => ({
+            date: s.timestamp.toLocaleDateString(),
+            status: s.presentStudents.some(p => p.studentId.toString() === studentId) ? 'Present' : 'Absent',
+            timeIn: s.timestamp.toLocaleTimeString(),
+            notes: ''
+          }))
+        };
+      } else {
+        // In-memory mode
+        const student = inMemoryStudents.find(s => s.id === studentId);
+        if (!student) {
+          return res.status(404).json({ success: false, message: 'Student not found' });
+        }
+
+        attendanceData = {
+          studentName: student.name,
+          email: student.email,
+          course: student.course,
+          presentDays: 15,
+          totalDays: 20,
+          attendanceRate: 75,
+          period: period || 'Last 30 days',
+          attendanceRecords: []
+        };
+      }
+    } else {
+      // Class summary
+      if (useDatabase) {
+        const students = await Student.find({ status: 'Active' });
+        const recentSnapshots = await AttendanceSnapshot.find()
+          .sort({ timestamp: -1 })
+          .limit(30);
+
+        attendanceData = {
+          period: period || 'Last 30 days',
+          totalStudents: students.length,
+          averageAttendance: 78,
+          presentToday: recentSnapshots[0]?.totalPresent || 0,
+          absentToday: recentSnapshots[0]?.totalAbsent || 0,
+          totalClassDays: recentSnapshots.length,
+          students: students.map(s => ({
+            name: s.name,
+            course: s.course,
+            attendanceRate: Math.floor(Math.random() * 40 + 60), // Mock data
+            presentDays: Math.floor(Math.random() * 20 + 10)
+          }))
+        };
+      } else {
+        attendanceData = {
+          period: period || 'Last 30 days',
+          totalStudents: inMemoryStudents.length,
+          averageAttendance: 78,
+          presentToday: 5,
+          absentToday: 2,
+          totalClassDays: 20
+        };
+      }
+    }
+
+    // Initialize email service if not already done
+    if (currentSettings && currentSettings.emailConfig) {
+      await emailService.initialize(currentSettings.emailConfig);
+    }
+
+    const result = await emailService.sendAttendanceReport(recipientEmail, attendanceData, reportType);
+    res.json({ success: true, message: 'Email sent successfully', messageId: result.messageId });
+
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ success: false, message: 'Failed to send email', error: error.message });
+  }
+});
+
+// Generate and download PDF report
+app.post('/api/attendance/pdf', async (req, res) => {
+  try {
+    const { studentId, reportType, period } = req.body;
+
+    let attendanceData;
+
+    if (reportType === 'individual' && studentId) {
+      // Get individual student data
+      if (useDatabase) {
+        const student = await Student.findById(studentId);
+        if (!student) {
+          return res.status(404).json({ success: false, message: 'Student not found' });
+        }
+
+        // Get attendance snapshots for the student
+        const snapshots = await AttendanceSnapshot.find({
+          $or: [
+            { 'presentStudents.studentId': studentId },
+            { 'absentStudents.studentId': studentId }
+          ]
+        }).sort({ timestamp: -1 }).limit(30);
+
+        const presentDays = snapshots.filter(s => 
+          s.presentStudents.some(p => p.studentId.toString() === studentId)
+        ).length;
+
+        const totalDays = snapshots.length;
+        const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+
+        attendanceData = {
+          studentName: student.name,
+          email: student.email,
+          course: student.course,
+          presentDays,
+          totalDays,
+          attendanceRate,
+          period: period || 'Last 30 days',
+          attendanceRecords: snapshots.map(s => ({
+            date: s.timestamp.toLocaleDateString(),
+            status: s.presentStudents.some(p => p.studentId.toString() === studentId) ? 'Present' : 'Absent',
+            timeIn: s.timestamp.toLocaleTimeString(),
+            notes: ''
+          }))
+        };
+      } else {
+        // In-memory mode
+        const student = inMemoryStudents.find(s => s.id === studentId);
+        if (!student) {
+          return res.status(404).json({ success: false, message: 'Student not found' });
+        }
+
+        attendanceData = {
+          studentName: student.name,
+          email: student.email,
+          course: student.course,
+          presentDays: 15,
+          totalDays: 20,
+          attendanceRate: 75,
+          period: period || 'Last 30 days',
+          attendanceRecords: []
+        };
+      }
+
+      const pdfBuffer = await pdfService.generateStudentAttendancePDF(attendanceData);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="attendance-report-${attendanceData.studentName.replace(/\s+/g, '-')}-${Date.now()}.pdf"`);
+      res.send(pdfBuffer);
+
+    } else {
+      // Class summary
+      if (useDatabase) {
+        const students = await Student.find({ status: 'Active' });
+        const recentSnapshots = await AttendanceSnapshot.find()
+          .sort({ timestamp: -1 })
+          .limit(30);
+
+        attendanceData = {
+          period: period || 'Last 30 days',
+          totalStudents: students.length,
+          averageAttendance: 78,
+          presentToday: recentSnapshots[0]?.totalPresent || 0,
+          absentToday: recentSnapshots[0]?.totalAbsent || 0,
+          totalClassDays: recentSnapshots.length,
+          students: students.map(s => ({
+            name: s.name,
+            course: s.course,
+            attendanceRate: Math.floor(Math.random() * 40 + 60), // Mock data
+            presentDays: Math.floor(Math.random() * 20 + 10)
+          }))
+        };
+      } else {
+        attendanceData = {
+          period: period || 'Last 30 days',
+          totalStudents: inMemoryStudents.length,
+          averageAttendance: 78,
+          presentToday: 5,
+          absentToday: 2,
+          totalClassDays: 20,
+          students: inMemoryStudents.map(s => ({
+            name: s.name,
+            course: s.course,
+            attendanceRate: Math.floor(Math.random() * 40 + 60),
+            presentDays: Math.floor(Math.random() * 20 + 10)
+          }))
+        };
+      }
+
+      const pdfBuffer = await pdfService.generateClassSummaryPDF(attendanceData);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="class-attendance-summary-${Date.now()}.pdf"`);
+      res.send(pdfBuffer);
+    }
+
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate PDF', error: error.message });
+  }
+});
+
+// Send PDF via email
+app.post('/api/attendance/email-pdf', async (req, res) => {
+  try {
+    const { recipientEmail, studentId, reportType, period } = req.body;
+
+    if (!recipientEmail) {
+      return res.status(400).json({ success: false, message: 'Recipient email is required' });
+    }
+
+    let attendanceData;
+    let pdfBuffer;
+
+    if (reportType === 'individual' && studentId) {
+      // Get individual student data and generate PDF
+      if (useDatabase) {
+        const student = await Student.findById(studentId);
+        if (!student) {
+          return res.status(404).json({ success: false, message: 'Student not found' });
+        }
+
+        const snapshots = await AttendanceSnapshot.find({
+          $or: [
+            { 'presentStudents.studentId': studentId },
+            { 'absentStudents.studentId': studentId }
+          ]
+        }).sort({ timestamp: -1 }).limit(30);
+
+        const presentDays = snapshots.filter(s => 
+          s.presentStudents.some(p => p.studentId.toString() === studentId)
+        ).length;
+
+        const totalDays = snapshots.length;
+        const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+
+        attendanceData = {
+          studentName: student.name,
+          email: student.email,
+          course: student.course,
+          presentDays,
+          totalDays,
+          attendanceRate,
+          period: period || 'Last 30 days',
+          attendanceRecords: snapshots.map(s => ({
+            date: s.timestamp.toLocaleDateString(),
+            status: s.presentStudents.some(p => p.studentId.toString() === studentId) ? 'Present' : 'Absent',
+            timeIn: s.timestamp.toLocaleTimeString(),
+            notes: ''
+          }))
+        };
+      } else {
+        const student = inMemoryStudents.find(s => s.id === studentId);
+        if (!student) {
+          return res.status(404).json({ success: false, message: 'Student not found' });
+        }
+
+        attendanceData = {
+          studentName: student.name,
+          email: student.email,
+          course: student.course,
+          presentDays: 15,
+          totalDays: 20,
+          attendanceRate: 75,
+          period: period || 'Last 30 days',
+          attendanceRecords: []
+        };
+      }
+
+      pdfBuffer = await pdfService.generateStudentAttendancePDF(attendanceData);
+    } else {
+      // Class summary
+      if (useDatabase) {
+        const students = await Student.find({ status: 'Active' });
+        const recentSnapshots = await AttendanceSnapshot.find()
+          .sort({ timestamp: -1 })
+          .limit(30);
+
+        attendanceData = {
+          period: period || 'Last 30 days',
+          totalStudents: students.length,
+          averageAttendance: 78,
+          presentToday: recentSnapshots[0]?.totalPresent || 0,
+          absentToday: recentSnapshots[0]?.totalAbsent || 0,
+          totalClassDays: recentSnapshots.length,
+          students: students.map(s => ({
+            name: s.name,
+            course: s.course,
+            attendanceRate: Math.floor(Math.random() * 40 + 60),
+            presentDays: Math.floor(Math.random() * 20 + 10)
+          }))
+        };
+      } else {
+        attendanceData = {
+          period: period || 'Last 30 days',
+          totalStudents: inMemoryStudents.length,
+          averageAttendance: 78,
+          presentToday: 5,
+          absentToday: 2,
+          totalClassDays: 20,
+          students: inMemoryStudents.map(s => ({
+            name: s.name,
+            course: s.course,
+            attendanceRate: Math.floor(Math.random() * 40 + 60),
+            presentDays: Math.floor(Math.random() * 20 + 10)
+          }))
+        };
+      }
+
+      pdfBuffer = await pdfService.generateClassSummaryPDF(attendanceData);
+    }
+
+    // Initialize email service and send with PDF attachment
+    if (currentSettings && currentSettings.emailConfig) {
+      await emailService.initialize(currentSettings.emailConfig);
+    }
+
+    const result = await emailService.sendAttendanceReportWithPDF(recipientEmail, attendanceData, pdfBuffer, reportType);
+    res.json({ success: true, message: 'Email with PDF sent successfully', messageId: result.messageId });
+
+  } catch (error) {
+    console.error('Error sending email with PDF:', error);
+    res.status(500).json({ success: false, message: 'Failed to send email with PDF', error: error.message });
+  }
+});
+
+// Test email configuration
+app.post('/api/settings/email/test', async (req, res) => {
+  try {
+    const { emailConfig, testEmail } = req.body;
+
+    if (!emailConfig || !testEmail) {
+      return res.status(400).json({ success: false, message: 'Email config and test email are required' });
+    }
+
+    const testResult = await emailService.testEmailConfig(emailConfig);
+    
+    if (testResult.success) {
+      // Send test email
+      await emailService.initialize(emailConfig);
+      const testData = {
+        studentName: 'Test Student',
+        course: 'Test Course',
+        presentDays: 15,
+        totalDays: 20,
+        attendanceRate: 75,
+        period: 'Test Period',
+        email: testEmail
+      };
+
+      await emailService.sendAttendanceReport(testEmail, testData, 'individual');
+      res.json({ success: true, message: 'Test email sent successfully' });
+    } else {
+      res.status(400).json({ success: false, message: testResult.message });
+    }
+
+  } catch (error) {
+    console.error('Error testing email configuration:', error);
+    res.status(500).json({ success: false, message: 'Failed to test email configuration', error: error.message });
+  }
+});
+
+// Debug endpoint to test current email configuration
+app.get('/api/debug/email', async (req, res) => {
+  try {
+    console.log('🔍 Debug: Testing current email configuration');
+    console.log('EMAIL_USER:', process.env.EMAIL_USER);
+    console.log('EMAIL_HOST:', process.env.EMAIL_HOST);
+    console.log('EMAIL_PORT:', process.env.EMAIL_PORT);
+    console.log('EMAIL_PASSWORD length:', process.env.EMAIL_PASSWORD ? process.env.EMAIL_PASSWORD.length : 'undefined');
+
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email credentials not configured',
+        debug: {
+          hasUser: !!process.env.EMAIL_USER,
+          hasPassword: !!process.env.EMAIL_PASSWORD
+        }
+      });
+    }
+
+    // Test with current environment config
+    const emailConfig = {
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.EMAIL_PORT) || 587,
+      secure: process.env.EMAIL_SECURE === 'true',
+      user: process.env.EMAIL_USER,
+      password: process.env.EMAIL_PASSWORD
+    };
+
+    // Initialize and test
+    await emailService.initialize(emailConfig);
+    
+    // Send test email to yourself
+    const testData = {
+      studentName: 'Debug Test',
+      email: process.env.EMAIL_USER,
+      course: 'Test Course',
+      presentDays: 15,
+      totalDays: 20,
+      attendanceRate: 75,
+      period: 'Debug Test',
+      attendanceRecords: []
+    };
+
+    await emailService.sendAttendanceReport(process.env.EMAIL_USER, testData, 'individual');
+    
+    res.json({ 
+      success: true, 
+      message: 'Debug email sent successfully to ' + process.env.EMAIL_USER 
+    });
+
+  } catch (error) {
+    console.error('❌ Debug email test failed:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Debug email test failed', 
+      error: error.message,
+      code: error.code
+    });
+  }
+});
+
+// Export student list as PDF
+app.get('/api/students/export/pdf', async (req, res) => {
+  try {
+    let studentsData = [];
+
+    if (useDatabase) {
+      const students = await Student.find({ status: 'Active' });
+      studentsData = students.map(s => ({
+        name: s.name,
+        email: s.email,
+        course: s.course,
+        macAddress: s.macAddress,
+        joinDate: s.joinDate ? s.joinDate.toLocaleDateString() : 'N/A',
+        status: s.status,
+        attendanceRate: Math.floor(Math.random() * 40 + 60) // Mock data for now
+      }));
+    } else {
+      studentsData = inMemoryStudents.map(s => ({
+        name: s.name,
+        email: s.email,
+        course: s.course,
+        macAddress: s.macAddress,
+        joinDate: s.joinDate || 'N/A',
+        status: s.status,
+        attendanceRate: Math.floor(Math.random() * 40 + 60)
+      }));
+    }
+
+    const studentListData = {
+      title: 'Student List Report',
+      generatedDate: new Date().toLocaleDateString(),
+      totalStudents: studentsData.length,
+      students: studentsData
+    };
+
+    const pdfBuffer = await pdfService.generateStudentListPDF(studentListData);
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="student-list-${Date.now()}.pdf"`);
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error('Error generating student list PDF:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate PDF', error: error.message });
+  }
+});
+
+// Send student list via email
+app.post('/api/students/export/email', async (req, res) => {
+  try {
+    const { recipientEmail } = req.body;
+
+    if (!recipientEmail) {
+      return res.status(400).json({ success: false, message: 'Recipient email is required' });
+    }
+
+    let studentsData = [];
+
+    if (useDatabase) {
+      const students = await Student.find({ status: 'Active' });
+      studentsData = students.map(s => ({
+        name: s.name,
+        email: s.email,
+        course: s.course,
+        macAddress: s.macAddress,
+        joinDate: s.joinDate ? s.joinDate.toLocaleDateString() : 'N/A',
+        status: s.status,
+        attendanceRate: Math.floor(Math.random() * 40 + 60)
+      }));
+    } else {
+      studentsData = inMemoryStudents.map(s => ({
+        name: s.name,
+        email: s.email,
+        course: s.course,
+        macAddress: s.macAddress,
+        joinDate: s.joinDate || 'N/A',
+        status: s.status,
+        attendanceRate: Math.floor(Math.random() * 40 + 60)
+      }));
+    }
+
+    const studentListData = {
+      title: 'Student List Report',
+      generatedDate: new Date().toLocaleDateString(),
+      totalStudents: studentsData.length,
+      students: studentsData
+    };
+
+    // Generate PDF
+    const pdfBuffer = await pdfService.generateStudentListPDF(studentListData);
+
+    // Send email with PDF attachment
+    if (currentSettings && currentSettings.emailConfig) {
+      await emailService.initialize(currentSettings.emailConfig);
+    }
+
+    await emailService.sendStudentListWithPDF(recipientEmail, studentListData, pdfBuffer);
+    res.json({ success: true, message: 'Student list sent successfully' });
+
+  } catch (error) {
+    console.error('Error sending student list email:', error);
+    res.status(500).json({ success: false, message: 'Failed to send email', error: error.message });
+  }
+});
+
 // Seed admin function
 const initializeAdmin = async () => {
   try {
@@ -764,12 +1354,36 @@ app.listen(PORT, async () => {
   await loadSettings();
   await initializeAdmin();
   
+  // Initialize email service with environment variables
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+    try {
+      const emailConfig = {
+        host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.EMAIL_PORT) || 587,
+        secure: process.env.EMAIL_SECURE === 'true',
+        user: process.env.EMAIL_USER,
+        password: process.env.EMAIL_PASSWORD,
+        from: process.env.EMAIL_FROM_ADDRESS || 'noreply@schooltracker.com'
+      };
+      await emailService.initialize(emailConfig);
+      console.log('✅ Email service initialized with environment config');
+    } catch (error) {
+      console.log('⚠️ Failed to initialize email service:', error.message);
+    }
+  } else {
+    console.log('⚠️ Email credentials not found in environment variables');
+  }
+  
   // Start periodic scraping if auto-snapshot is enabled
   if (currentSettings && currentSettings.autoSnapshot) {
     try {
       const scraperInstance = getScraper();
-      await scraperInstance.startPeriodicScraping(currentSettings.snapshotInterval, processScrapedMACs);
-      console.log('✅ Automatic attendance tracking started');
+      if (scraperInstance) {
+        await scraperInstance.startPeriodicScraping(currentSettings.snapshotInterval, processScrapedMACs);
+        console.log('✅ Automatic attendance tracking started');
+      } else {
+        console.log('⚠️ Scraper not available, automatic tracking disabled');
+      }
     } catch (error) {
       console.error('❌ Failed to start scraping:', error);
     }

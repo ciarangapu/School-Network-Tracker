@@ -9,6 +9,7 @@ import AttendanceSettings from './AttendanceSettings';
 import AttendanceReports from './AttendanceReports';
 import StudentManagement from './StudentManagement';
 import LiveMacData from './LiveMacData';
+import EmailSettings from './EmailSettings';
 
 const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -26,6 +27,7 @@ const AdminDashboard = () => {
             <Route path="/groups" element={<GroupSettings />} />
             <Route path="/shifts" element={<ShiftSettings />} />
             <Route path="/settings" element={<AttendanceSettings />} />
+            <Route path="/email-settings" element={<EmailSettings />} />
             <Route path="/reports" element={<AttendanceReports />} />
             <Route path="/students" element={<StudentManagement />} />
             <Route path="/live-mac" element={<LiveMacData />} />

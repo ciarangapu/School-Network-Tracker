@@ -12,6 +12,9 @@ const StudentAttendance = () => {
   const [viewType, setViewType] = useState('daily');
   const [attendanceData, setAttendanceData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [emailAddress, setEmailAddress] = useState('');
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -75,12 +78,45 @@ const StudentAttendance = () => {
     }
   };
 
-  const handleExportPDF = () => {
-    console.log('Exporting attendance as PDF...');
+  const handleExportPDF = async () => {
+    try {
+      setIsProcessing(true);
+      await ApiService.downloadAttendancePDF(user?.id, 'individual', `${dateRange.start} to ${dateRange.end}`);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Failed to download PDF. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleSendEmail = () => {
-    console.log('Sending attendance via email...');
+    setEmailAddress(user?.email || '');
+    setShowEmailDialog(true);
+  };
+
+  const handleEmailSubmit = async () => {
+    if (!emailAddress.trim()) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      await ApiService.sendAttendanceEmailWithPDF(
+        emailAddress,
+        user?.id,
+        'individual',
+        `${dateRange.start} to ${dateRange.end}`
+      );
+      alert('Attendance report sent successfully!');
+      setShowEmailDialog(false);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      alert('Failed to send email. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const presentDays = attendanceData.filter(day => day.status === 'Present').length;
@@ -277,6 +313,43 @@ const StudentAttendance = () => {
           </table>
         </div>
       </div>
+
+      {/* Email Dialog */}
+      {showEmailDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Email Attendance Report</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={emailAddress}
+                onChange={(e) => setEmailAddress(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter email address"
+              />
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowEmailDialog(false)}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                disabled={isProcessing}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEmailSubmit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                disabled={isProcessing}
+              >
+                {isProcessing ? 'Sending...' : 'Send Email'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
