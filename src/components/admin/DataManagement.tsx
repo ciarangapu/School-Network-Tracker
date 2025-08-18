@@ -14,6 +14,8 @@ const DataManagement: React.FC = () => {
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState<string | null>(null);
+  const [emailLoading, setEmailLoading] = useState<string | null>(null);
+  const [testEmail, setTestEmail] = useState('');
 
   useEffect(() => {
     fetchSystemStats();
@@ -108,6 +110,88 @@ const DataManagement: React.FC = () => {
     }
   };
 
+  const handleSendWeeklyReports = async () => {
+    setEmailLoading('weekly');
+    try {
+      const response = await fetch('/api/admin/send-weekly-reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert('Weekly reports sent successfully to all students!');
+      } else {
+        alert(`Failed to send reports: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('Error sending weekly reports:', error);
+      alert('Error sending weekly reports');
+    } finally {
+      setEmailLoading(null);
+    }
+  };
+
+  const handleSendMonthlyReports = async () => {
+    setEmailLoading('monthly');
+    try {
+      const response = await fetch('/api/admin/send-monthly-reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert('Monthly reports sent successfully to all students!');
+      } else {
+        alert(`Failed to send reports: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('Error sending monthly reports:', error);
+      alert('Error sending monthly reports');
+    } finally {
+      setEmailLoading(null);
+    }
+  };
+
+  const handleTestShiftNotification = async () => {
+    if (!testEmail) {
+      alert('Please enter an email address');
+      return;
+    }
+
+    setEmailLoading('test');
+    try {
+      const response = await fetch('/api/admin/test-shift-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          studentEmail: testEmail,
+          isPresent: true
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert('Test notification sent successfully!');
+        setTestEmail('');
+      } else {
+        alert(`Failed to send test: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      alert('Error sending test notification');
+    } finally {
+      setEmailLoading(null);
+    }
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Never';
     return new Date(dateString).toLocaleString();
@@ -149,6 +233,71 @@ const DataManagement: React.FC = () => {
               <strong>Last Snapshot:</strong> {formatDate(stats.lastSnapshotTime)}
             </div>
           )}
+        </div>
+
+        {/* Email Management */}
+        <div className="space-y-6">
+          <h3 className="text-lg font-semibold text-gray-700">Email Management</h3>
+          
+          {/* Automatic Email Reports */}
+          <div className="border border-gray-200 rounded-lg p-4">
+            <h4 className="font-medium text-gray-800 mb-3">📧 Send Reports Manually</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Send weekly or monthly attendance summaries to all active students. 
+              (Automatic emails are sent every Sunday for weekly and 1st of month for monthly)
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={handleSendWeeklyReports}
+                disabled={emailLoading === 'weekly'}
+                className="mr-3 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+              >
+                {emailLoading === 'weekly' ? 'Sending...' : 'Send Weekly Reports'}
+              </button>
+              <button
+                onClick={handleSendMonthlyReports}
+                disabled={emailLoading === 'monthly'}
+                className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50"
+              >
+                {emailLoading === 'monthly' ? 'Sending...' : 'Send Monthly Reports'}
+              </button>
+            </div>
+          </div>
+
+          {/* Test Email Notifications */}
+          <div className="border border-gray-200 rounded-lg p-4">
+            <h4 className="font-medium text-gray-800 mb-3">🧪 Test Email Notifications</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Test the shift attendance notification system by sending a sample email.
+            </p>
+            <div className="flex space-x-2">
+              <input
+                type="email"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                placeholder="Enter email address to test"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={handleTestShiftNotification}
+                disabled={emailLoading === 'test' || !testEmail}
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+              >
+                {emailLoading === 'test' ? 'Sending...' : 'Send Test'}
+              </button>
+            </div>
+          </div>
+
+          {/* Email Info */}
+          <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+            <h4 className="font-medium text-blue-800 mb-3">ℹ️ Automatic Email Schedule</h4>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li><strong>Shift Notifications:</strong> Sent automatically after each attendance snapshot</li>
+              <li><strong>Weekly Summaries:</strong> Sent every Sunday at 6:00 PM</li>
+              <li><strong>Monthly Summaries:</strong> Sent on the 1st of each month at 9:00 AM</li>
+              <li><strong>Email Configuration:</strong> Set up in Email Settings page</li>
+            </ul>
+          </div>
         </div>
 
         {/* Data Reset Controls */}

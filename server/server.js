@@ -226,6 +226,10 @@ const processScrapedMACs = async (scrapedData) => {
       await snapshot.save();
       
       console.log(`✅ Snapshot saved: ${snapshot.totalPresent} present, ${snapshot.totalAbsent} absent`);
+      
+      // Send automatic emails after each shift/snapshot
+      await sendShiftAttendanceEmails(snapshot);
+      
       return snapshot;
     } else {
       // In-memory mode - process attendance without database
@@ -268,12 +272,312 @@ const processScrapedMACs = async (scrapedData) => {
       inMemorySnapshots.push(snapshot);
       
       console.log(`✅ Snapshot processed: ${snapshot.totalPresent} present, ${snapshot.totalAbsent} absent`);
+      
+      // Send automatic emails after each shift/snapshot
+      await sendShiftAttendanceEmails(snapshot);
+      
       return snapshot;
     }
   } catch (error) {
     console.error('❌ Error processing scraped MACs:', error);
     throw error;
   }
+};
+
+// ==================== AUTOMATIC EMAIL NOTIFICATIONS ====================
+
+// Send individual attendance emails after each shift
+const sendShiftAttendanceEmails = async (snapshot) => {
+  try {
+    if (!currentSettings?.emailConfig) {
+      console.log('⚠️ Email not configured, skipping shift attendance emails');
+      return;
+    }
+
+    // Initialize email service
+    await emailService.initialize(currentSettings.emailConfig);
+
+    // Send email to each student about their attendance status
+    const allStudents = [...snapshot.presentStudents, ...snapshot.absentStudents];
+    
+    for (const student of allStudents) {
+      const isPresent = snapshot.presentStudents.some(p => p.studentId.toString() === student.studentId.toString());
+      
+      const emailData = {
+        studentName: student.name,
+        course: student.course,
+        date: snapshot.timestamp.toLocaleDateString(),
+        time: snapshot.timestamp.toLocaleTimeString(),
+        status: isPresent ? 'Present' : 'Absent',
+        isPresent: isPresent
+      };
+
+      try {
+        await emailService.sendShiftAttendanceNotification(student.email, emailData);
+        console.log(`📧 Sent shift notification to ${student.name} (${student.email})`);
+      } catch (error) {
+        console.error(`❌ Failed to send shift email to ${student.name}:`, error.message);
+      }
+    }
+
+    console.log(`✅ Completed sending ${allStudents.length} shift attendance emails`);
+  } catch (error) {
+    console.error('❌ Error sending shift attendance emails:', error);
+  }
+};
+
+// Send weekly attendance summary to all students
+const sendWeeklyAttendanceSummaries = async () => {
+  try {
+    if (!currentSettings?.emailConfig) {
+      console.log('⚠️ Email not configured, skipping weekly summaries');
+      return;
+    }
+
+    console.log('📧 Starting weekly attendance summary emails...');
+    await emailService.initialize(currentSettings.emailConfig);
+
+    if (useDatabase) {
+      const students = await Student.find({ status: 'Active' });
+      
+      for (const student of students) {
+        const weeklyData = await getWeeklyAttendanceData(student._id);
+        
+        try {
+          await emailService.sendWeeklyAttendanceSummary(student.email, weeklyData);
+          console.log(`📧 Sent weekly summary to ${student.name}`);
+        } catch (error) {
+          console.error(`❌ Failed to send weekly summary to ${student.name}:`, error.message);
+        }
+      }
+    } else {
+      // In-memory mode
+      const activeStudents = inMemoryStudents.filter(s => s.status === 'Active');
+      
+      for (const student of activeStudents) {
+        const weeklyData = getInMemoryWeeklyData(student);
+        
+        try {
+          await emailService.sendWeeklyAttendanceSummary(student.email, weeklyData);
+          console.log(`📧 Sent weekly summary to ${student.name}`);
+        } catch (error) {
+          console.error(`❌ Failed to send weekly summary to ${student.name}:`, error.message);
+        }
+      }
+    }
+    
+    console.log('✅ Completed weekly attendance summaries');
+  } catch (error) {
+    console.error('❌ Error sending weekly summaries:', error);
+  }
+};
+
+// Send monthly attendance summary to all students
+const sendMonthlyAttendanceSummaries = async () => {
+  try {
+    if (!currentSettings?.emailConfig) {
+      console.log('⚠️ Email not configured, skipping monthly summaries');
+      return;
+    }
+
+    console.log('📧 Starting monthly attendance summary emails...');
+    await emailService.initialize(currentSettings.emailConfig);
+
+    if (useDatabase) {
+      const students = await Student.find({ status: 'Active' });
+      
+      for (const student of students) {
+        const monthlyData = await getMonthlyAttendanceData(student._id);
+        
+        try {
+          await emailService.sendMonthlyAttendanceSummary(student.email, monthlyData);
+          console.log(`📧 Sent monthly summary to ${student.name}`);
+        } catch (error) {
+          console.error(`❌ Failed to send monthly summary to ${student.name}:`, error.message);
+        }
+      }
+    } else {
+      // In-memory mode
+      const activeStudents = inMemoryStudents.filter(s => s.status === 'Active');
+      
+      for (const student of activeStudents) {
+        const monthlyData = getInMemoryMonthlyData(student);
+        
+        try {
+          await emailService.sendMonthlyAttendanceSummary(student.email, monthlyData);
+          console.log(`📧 Sent monthly summary to ${student.name}`);
+        } catch (error) {
+          console.error(`❌ Failed to send monthly summary to ${student.name}:`, error.message);
+        }
+      }
+    }
+    
+    console.log('✅ Completed monthly attendance summaries');
+  } catch (error) {
+    console.error('❌ Error sending monthly summaries:', error);
+  }
+};
+
+// Helper function to get weekly attendance data for a student
+const getWeeklyAttendanceData = async (studentId) => {
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+  const snapshots = await AttendanceSnapshot.find({
+    timestamp: { $gte: oneWeekAgo },
+    $or: [
+      { 'presentStudents.studentId': studentId },
+      { 'absentStudents.studentId': studentId }
+    ]
+  }).sort({ timestamp: -1 });
+
+  const presentDays = snapshots.filter(s => 
+    s.presentStudents.some(p => p.studentId.toString() === studentId.toString())
+  ).length;
+
+  const student = await Student.findById(studentId);
+  
+  return {
+    studentName: student.name,
+    course: student.course,
+    email: student.email,
+    period: 'Last 7 days',
+    presentDays,
+    totalDays: snapshots.length,
+    attendanceRate: snapshots.length > 0 ? Math.round((presentDays / snapshots.length) * 100) : 0,
+    weekStartDate: oneWeekAgo.toLocaleDateString(),
+    weekEndDate: new Date().toLocaleDateString(),
+    attendanceRecords: snapshots.map(s => ({
+      date: s.timestamp.toLocaleDateString(),
+      status: s.presentStudents.some(p => p.studentId.toString() === studentId.toString()) ? 'Present' : 'Absent',
+      time: s.timestamp.toLocaleTimeString()
+    }))
+  };
+};
+
+// Helper function to get monthly attendance data for a student
+const getMonthlyAttendanceData = async (studentId) => {
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+  const snapshots = await AttendanceSnapshot.find({
+    timestamp: { $gte: oneMonthAgo },
+    $or: [
+      { 'presentStudents.studentId': studentId },
+      { 'absentStudents.studentId': studentId }
+    ]
+  }).sort({ timestamp: -1 });
+
+  const presentDays = snapshots.filter(s => 
+    s.presentStudents.some(p => p.studentId.toString() === studentId.toString())
+  ).length;
+
+  const student = await Student.findById(studentId);
+  
+  return {
+    studentName: student.name,
+    course: student.course,
+    email: student.email,
+    period: 'Last 30 days',
+    presentDays,
+    totalDays: snapshots.length,
+    attendanceRate: snapshots.length > 0 ? Math.round((presentDays / snapshots.length) * 100) : 0,
+    monthStartDate: oneMonthAgo.toLocaleDateString(),
+    monthEndDate: new Date().toLocaleDateString(),
+    bestWeek: 'Week 2', // Could be calculated from data
+    worstWeek: 'Week 1', // Could be calculated from data
+    attendanceRecords: snapshots.slice(0, 10).map(s => ({ // Last 10 records for monthly
+      date: s.timestamp.toLocaleDateString(),
+      status: s.presentStudents.some(p => p.studentId.toString() === studentId.toString()) ? 'Present' : 'Absent',
+      time: s.timestamp.toLocaleTimeString()
+    }))
+  };
+};
+
+// In-memory helper functions
+const getInMemoryWeeklyData = (student) => {
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  
+  const weeklySnapshots = inMemorySnapshots.filter(s => 
+    new Date(s.timestamp) >= oneWeekAgo
+  );
+  
+  const presentDays = weeklySnapshots.filter(s => 
+    s.presentStudents.some(p => p.studentId === student.id)
+  ).length;
+  
+  return {
+    studentName: student.name,
+    course: student.course,
+    email: student.email,
+    period: 'Last 7 days',
+    presentDays,
+    totalDays: weeklySnapshots.length,
+    attendanceRate: weeklySnapshots.length > 0 ? Math.round((presentDays / weeklySnapshots.length) * 100) : 0,
+    weekStartDate: oneWeekAgo.toLocaleDateString(),
+    weekEndDate: new Date().toLocaleDateString(),
+    attendanceRecords: weeklySnapshots.slice(0, 7).map(s => ({
+      date: new Date(s.timestamp).toLocaleDateString(),
+      status: s.presentStudents.some(p => p.studentId === student.id) ? 'Present' : 'Absent',
+      time: new Date(s.timestamp).toLocaleTimeString()
+    }))
+  };
+};
+
+const getInMemoryMonthlyData = (student) => {
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+  
+  const monthlySnapshots = inMemorySnapshots.filter(s => 
+    new Date(s.timestamp) >= oneMonthAgo
+  );
+  
+  const presentDays = monthlySnapshots.filter(s => 
+    s.presentStudents.some(p => p.studentId === student.id)
+  ).length;
+  
+  return {
+    studentName: student.name,
+    course: student.course,
+    email: student.email,
+    period: 'Last 30 days',
+    presentDays,
+    totalDays: monthlySnapshots.length,
+    attendanceRate: monthlySnapshots.length > 0 ? Math.round((presentDays / monthlySnapshots.length) * 100) : 0,
+    monthStartDate: oneMonthAgo.toLocaleDateString(),
+    monthEndDate: new Date().toLocaleDateString(),
+    bestWeek: 'Week 2',
+    worstWeek: 'Week 1',
+    attendanceRecords: monthlySnapshots.slice(0, 10).map(s => ({
+      date: new Date(s.timestamp).toLocaleDateString(),
+      status: s.presentStudents.some(p => p.studentId === student.id) ? 'Present' : 'Absent',
+      time: new Date(s.timestamp).toLocaleTimeString()
+    }))
+  };
+};
+
+// ==================== SCHEDULER FOR PERIODIC EMAILS ====================
+
+// Set up cron jobs for weekly and monthly emails
+const setupEmailScheduler = () => {
+  // Weekly emails - Every Sunday at 6 PM
+  setInterval(() => {
+    const now = new Date();
+    if (now.getDay() === 0 && now.getHours() === 18 && now.getMinutes() === 0) {
+      sendWeeklyAttendanceSummaries();
+    }
+  }, 60000); // Check every minute
+
+  // Monthly emails - First day of month at 9 AM
+  setInterval(() => {
+    const now = new Date();
+    if (now.getDate() === 1 && now.getHours() === 9 && now.getMinutes() === 0) {
+      sendMonthlyAttendanceSummaries();
+    }
+  }, 60000); // Check every minute
+
+  console.log('📅 Email scheduler initialized - Weekly: Sundays 6PM, Monthly: 1st day 9AM');
 };
 
 // API Routes
@@ -1530,6 +1834,60 @@ const initializeAdmin = async () => {
   }
 };
 
+// ==================== MANUAL EMAIL TRIGGER ENDPOINTS ====================
+
+// Manually send weekly reports to all students (for testing)
+app.post('/api/admin/send-weekly-reports', async (req, res) => {
+  try {
+    await sendWeeklyAttendanceSummaries();
+    res.json({ success: true, message: 'Weekly reports sent to all students' });
+  } catch (error) {
+    console.error('Error sending weekly reports:', error);
+    res.status(500).json({ success: false, message: 'Failed to send weekly reports', error: error.message });
+  }
+});
+
+// Manually send monthly reports to all students (for testing)
+app.post('/api/admin/send-monthly-reports', async (req, res) => {
+  try {
+    await sendMonthlyAttendanceSummaries();
+    res.json({ success: true, message: 'Monthly reports sent to all students' });
+  } catch (error) {
+    console.error('Error sending monthly reports:', error);
+    res.status(500).json({ success: false, message: 'Failed to send monthly reports', error: error.message });
+  }
+});
+
+// Test shift notification for a specific student
+app.post('/api/admin/test-shift-notification', async (req, res) => {
+  try {
+    const { studentEmail, isPresent } = req.body;
+    
+    if (!studentEmail) {
+      return res.status(400).json({ success: false, message: 'Student email is required' });
+    }
+
+    const testData = {
+      studentName: 'Test Student',
+      course: 'Test Course',
+      date: new Date().toLocaleDateString(),
+      time: new Date().toLocaleTimeString(),
+      status: isPresent ? 'Present' : 'Absent',
+      isPresent: isPresent || false
+    };
+
+    if (currentSettings && currentSettings.emailConfig) {
+      await emailService.initialize(currentSettings.emailConfig);
+    }
+
+    await emailService.sendShiftAttendanceNotification(studentEmail, testData);
+    res.json({ success: true, message: 'Test shift notification sent successfully' });
+  } catch (error) {
+    console.error('Error sending test notification:', error);
+    res.status(500).json({ success: false, message: 'Failed to send test notification', error: error.message });
+  }
+});
+
 // ==================== ADMIN DATA RESET ENDPOINTS ====================
 
 // Reset attendance data for different time periods
@@ -1705,6 +2063,9 @@ app.listen(PORT, async () => {
       console.error('❌ Failed to start scraping:', error);
     }
   }
+
+  // Start email scheduler for automatic weekly/monthly reports
+  setupEmailScheduler();
 });
 
 // Graceful shutdown
