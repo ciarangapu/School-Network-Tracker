@@ -140,6 +140,29 @@ const loadSettings = async () => {
   }
 };
 
+// Helper function to calculate real attendance rate for a student
+const calculateStudentAttendanceRate = async (studentId) => {
+  try {
+    if (useDatabase) {
+      const snapshots = await AttendanceSnapshot.find({});
+      const presentCount = snapshots.filter(s => 
+        s.presentStudents.some(p => p.studentId.toString() === studentId.toString())
+      ).length;
+      const totalSnapshots = snapshots.length;
+      return totalSnapshots > 0 ? Math.round((presentCount / totalSnapshots) * 100) : 0;
+    } else {
+      const presentCount = inMemorySnapshots.filter(s => 
+        s.presentStudents.some(p => p.studentId === studentId)
+      ).length;
+      const totalSnapshots = inMemorySnapshots.length;
+      return totalSnapshots > 0 ? Math.round((presentCount / totalSnapshots) * 100) : 0;
+    }
+  } catch (error) {
+    console.error('Error calculating attendance rate:', error);
+    return 0;
+  }
+};
+
 // Process scraped MAC addresses
 const processScrapedMACs = async (scrapedData) => {
   try {
@@ -458,13 +481,70 @@ app.get('/api/students', async (req, res) => {
   try {
     if (useDatabase) {
       const students = await Student.find().sort({ createdAt: -1 });
-      res.json(students);
+      
+      // Calculate real attendance rates for each student
+      const studentsWithAttendance = await Promise.all(
+        students.map(async (student) => {
+          try {
+            // Get all snapshots for this student
+            const snapshots = await AttendanceSnapshot.find({});
+            
+            // Count how many times this student was present
+            const presentCount = snapshots.filter(s => 
+              s.presentStudents.some(p => p.studentId.toString() === student._id.toString())
+            ).length;
+            
+            // Total snapshots taken
+            const totalSnapshots = snapshots.length;
+            
+            // Calculate attendance rate
+            const attendanceRate = totalSnapshots > 0 ? 
+              Math.round((presentCount / totalSnapshots) * 100) : 0;
+            
+            return {
+              ...student.toObject(),
+              attendanceRate,
+              presentCount,
+              totalSnapshots
+            };
+          } catch (error) {
+            console.error(`Error calculating attendance for ${student.name}:`, error);
+            return {
+              ...student.toObject(),
+              attendanceRate: 0,
+              presentCount: 0,
+              totalSnapshots: 0
+            };
+          }
+        })
+      );
+      
+      res.json(studentsWithAttendance);
     } else {
       // Return in-memory students sorted by creation date
       const sortedStudents = inMemoryStudents.sort((a, b) => 
         new Date(b.createdAt) - new Date(a.createdAt)
       );
-      res.json(sortedStudents);
+      
+      // For in-memory mode, add fake attendance calculation based on snapshots
+      const studentsWithAttendance = sortedStudents.map(student => {
+        const presentCount = inMemorySnapshots.filter(s => 
+          s.presentStudents.some(p => p.studentId === student.id)
+        ).length;
+        
+        const totalSnapshots = inMemorySnapshots.length;
+        const attendanceRate = totalSnapshots > 0 ? 
+          Math.round((presentCount / totalSnapshots) * 100) : 0;
+        
+        return {
+          ...student,
+          attendanceRate,
+          presentCount,
+          totalSnapshots
+        };
+      });
+      
+      res.json(studentsWithAttendance);
     }
   } catch (error) {
     console.error('Error fetching students:', error);
@@ -840,28 +920,58 @@ app.post('/api/attendance/email', async (req, res) => {
           .sort({ timestamp: -1 })
           .limit(30);
 
+        // Calculate real attendance data for each student
+        const studentsWithAttendance = await Promise.all(
+          students.map(async (s) => {
+            const attendanceRate = await calculateStudentAttendanceRate(s._id);
+            const presentDays = Math.round((attendanceRate / 100) * recentSnapshots.length);
+            return {
+              name: s.name,
+              course: s.course,
+              attendanceRate,
+              presentDays
+            };
+          })
+        );
+
+        // Calculate average attendance
+        const averageAttendance = studentsWithAttendance.length > 0 ? 
+          Math.round(studentsWithAttendance.reduce((sum, s) => sum + s.attendanceRate, 0) / studentsWithAttendance.length) : 0;
+
         attendanceData = {
           period: period || 'Last 30 days',
           totalStudents: students.length,
-          averageAttendance: 78,
+          averageAttendance,
           presentToday: recentSnapshots[0]?.totalPresent || 0,
           absentToday: recentSnapshots[0]?.totalAbsent || 0,
           totalClassDays: recentSnapshots.length,
-          students: students.map(s => ({
-            name: s.name,
-            course: s.course,
-            attendanceRate: Math.floor(Math.random() * 40 + 60), // Mock data
-            presentDays: Math.floor(Math.random() * 20 + 10)
-          }))
+          students: studentsWithAttendance
         };
       } else {
+        // In-memory mode with real calculations
+        const activeStudents = inMemoryStudents.filter(s => s.status === 'Active');
+        const studentsWithAttendance = activeStudents.map(s => {
+          const attendanceRate = calculateStudentAttendanceRate(s.id);
+          const presentDays = Math.round((attendanceRate / 100) * inMemorySnapshots.length);
+          return {
+            name: s.name,
+            course: s.course,
+            attendanceRate,
+            presentDays
+          };
+        });
+
+        const averageAttendance = studentsWithAttendance.length > 0 ? 
+          Math.round(studentsWithAttendance.reduce((sum, s) => sum + s.attendanceRate, 0) / studentsWithAttendance.length) : 0;
+
         attendanceData = {
           period: period || 'Last 30 days',
           totalStudents: inMemoryStudents.length,
-          averageAttendance: 78,
-          presentToday: 5,
-          absentToday: 2,
-          totalClassDays: 20
+          averageAttendance,
+          presentToday: inMemorySnapshots[inMemorySnapshots.length - 1]?.totalPresent || 0,
+          absentToday: inMemorySnapshots[inMemorySnapshots.length - 1]?.totalAbsent || 0,
+          totalClassDays: inMemorySnapshots.length,
+          students: studentsWithAttendance
         };
       }
     }
@@ -965,11 +1075,15 @@ app.post('/api/attendance/pdf', async (req, res) => {
           presentToday: recentSnapshots[0]?.totalPresent || 0,
           absentToday: recentSnapshots[0]?.totalAbsent || 0,
           totalClassDays: recentSnapshots.length,
-          students: students.map(s => ({
-            name: s.name,
-            course: s.course,
-            attendanceRate: Math.floor(Math.random() * 40 + 60), // Mock data
-            presentDays: Math.floor(Math.random() * 20 + 10)
+          students: await Promise.all(students.map(async (s) => {
+            const attendanceRate = await calculateStudentAttendanceRate(s._id);
+            const presentDays = Math.max(1, Math.floor(attendanceRate * recentSnapshots.length / 100));
+            return {
+              name: s.name,
+              course: s.course,
+              attendanceRate,
+              presentDays
+            };
           }))
         };
       } else {
@@ -980,12 +1094,16 @@ app.post('/api/attendance/pdf', async (req, res) => {
           presentToday: 5,
           absentToday: 2,
           totalClassDays: 20,
-          students: inMemoryStudents.map(s => ({
-            name: s.name,
-            course: s.course,
-            attendanceRate: Math.floor(Math.random() * 40 + 60),
-            presentDays: Math.floor(Math.random() * 20 + 10)
-          }))
+          students: inMemoryStudents.map(s => {
+            const attendanceRate = calculateStudentAttendanceRate(s.id);
+            const presentDays = Math.max(1, Math.floor(attendanceRate * 20 / 100));
+            return {
+              name: s.name,
+              course: s.course,
+              attendanceRate,
+              presentDays
+            };
+          })
         };
       }
 
@@ -1085,11 +1203,15 @@ app.post('/api/attendance/email-pdf', async (req, res) => {
           presentToday: recentSnapshots[0]?.totalPresent || 0,
           absentToday: recentSnapshots[0]?.totalAbsent || 0,
           totalClassDays: recentSnapshots.length,
-          students: students.map(s => ({
-            name: s.name,
-            course: s.course,
-            attendanceRate: Math.floor(Math.random() * 40 + 60),
-            presentDays: Math.floor(Math.random() * 20 + 10)
+          students: await Promise.all(students.map(async (s) => {
+            const attendanceRate = await calculateStudentAttendanceRate(s._id);
+            const presentDays = Math.max(1, Math.floor(attendanceRate * recentSnapshots.length / 100));
+            return {
+              name: s.name,
+              course: s.course,
+              attendanceRate,
+              presentDays
+            };
           }))
         };
       } else {
@@ -1100,12 +1222,16 @@ app.post('/api/attendance/email-pdf', async (req, res) => {
           presentToday: 5,
           absentToday: 2,
           totalClassDays: 20,
-          students: inMemoryStudents.map(s => ({
-            name: s.name,
-            course: s.course,
-            attendanceRate: Math.floor(Math.random() * 40 + 60),
-            presentDays: Math.floor(Math.random() * 20 + 10)
-          }))
+          students: inMemoryStudents.map(s => {
+            const attendanceRate = calculateStudentAttendanceRate(s.id);
+            const presentDays = Math.max(1, Math.floor(attendanceRate * 20 / 100));
+            return {
+              name: s.name,
+              course: s.course,
+              attendanceRate,
+              presentDays
+            };
+          })
         };
       }
 
@@ -1224,6 +1350,46 @@ app.get('/api/debug/email', async (req, res) => {
   }
 });
 
+// Debug endpoint to check attendance snapshots
+app.get('/api/debug/attendance', async (req, res) => {
+  try {
+    if (useDatabase) {
+      const totalSnapshots = await AttendanceSnapshot.countDocuments();
+      const recentSnapshots = await AttendanceSnapshot.find()
+        .sort({ timestamp: -1 })
+        .limit(5)
+        .select('timestamp totalPresent totalAbsent scrapedMACs');
+      
+      const totalStudents = await Student.countDocuments({ status: 'Active' });
+      
+      res.json({
+        success: true,
+        database: true,
+        totalSnapshots,
+        totalStudents,
+        recentSnapshots,
+        message: totalSnapshots === 0 ? 'No attendance snapshots found - scraper may not be running' : 'Attendance data found'
+      });
+    } else {
+      res.json({
+        success: true,
+        database: false,
+        totalSnapshots: inMemorySnapshots.length,
+        totalStudents: inMemoryStudents.length,
+        recentSnapshots: inMemorySnapshots.slice(-5),
+        message: inMemorySnapshots.length === 0 ? 'No attendance snapshots found - scraper may not be running' : 'In-memory attendance data found'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Debug attendance check failed:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Debug attendance check failed', 
+      error: error.message
+    });
+  }
+});
+
 // Export student list as PDF
 app.get('/api/students/export/pdf', async (req, res) => {
   try {
@@ -1231,25 +1397,34 @@ app.get('/api/students/export/pdf', async (req, res) => {
 
     if (useDatabase) {
       const students = await Student.find({ status: 'Active' });
-      studentsData = students.map(s => ({
-        name: s.name,
-        email: s.email,
-        course: s.course,
-        macAddress: s.macAddress,
-        joinDate: s.joinDate ? s.joinDate.toLocaleDateString() : 'N/A',
-        status: s.status,
-        attendanceRate: Math.floor(Math.random() * 40 + 60) // Mock data for now
-      }));
+      // Calculate real attendance rates for each student
+      studentsData = await Promise.all(
+        students.map(async (s) => {
+          const attendanceRate = await calculateStudentAttendanceRate(s._id);
+          return {
+            name: s.name,
+            email: s.email,
+            course: s.course,
+            macAddress: s.macAddress,
+            joinDate: s.joinDate ? s.joinDate.toLocaleDateString() : 'N/A',
+            status: s.status,
+            attendanceRate
+          };
+        })
+      );
     } else {
-      studentsData = inMemoryStudents.map(s => ({
-        name: s.name,
-        email: s.email,
-        course: s.course,
-        macAddress: s.macAddress,
-        joinDate: s.joinDate || 'N/A',
-        status: s.status,
-        attendanceRate: Math.floor(Math.random() * 40 + 60)
-      }));
+      studentsData = inMemoryStudents.map(s => {
+        const attendanceRate = calculateStudentAttendanceRate(s.id);
+        return {
+          name: s.name,
+          email: s.email,
+          course: s.course,
+          macAddress: s.macAddress,
+          joinDate: s.joinDate || 'N/A',
+          status: s.status,
+          attendanceRate
+        };
+      });
     }
 
     const studentListData = {
@@ -1284,25 +1459,34 @@ app.post('/api/students/export/email', async (req, res) => {
 
     if (useDatabase) {
       const students = await Student.find({ status: 'Active' });
-      studentsData = students.map(s => ({
-        name: s.name,
-        email: s.email,
-        course: s.course,
-        macAddress: s.macAddress,
-        joinDate: s.joinDate ? s.joinDate.toLocaleDateString() : 'N/A',
-        status: s.status,
-        attendanceRate: Math.floor(Math.random() * 40 + 60)
-      }));
+      // Calculate real attendance rates for each student
+      studentsData = await Promise.all(
+        students.map(async (s) => {
+          const attendanceRate = await calculateStudentAttendanceRate(s._id);
+          return {
+            name: s.name,
+            email: s.email,
+            course: s.course,
+            macAddress: s.macAddress,
+            joinDate: s.joinDate ? s.joinDate.toLocaleDateString() : 'N/A',
+            status: s.status,
+            attendanceRate
+          };
+        })
+      );
     } else {
-      studentsData = inMemoryStudents.map(s => ({
-        name: s.name,
-        email: s.email,
-        course: s.course,
-        macAddress: s.macAddress,
-        joinDate: s.joinDate || 'N/A',
-        status: s.status,
-        attendanceRate: Math.floor(Math.random() * 40 + 60)
-      }));
+      studentsData = inMemoryStudents.map(s => {
+        const attendanceRate = calculateStudentAttendanceRate(s.id);
+        return {
+          name: s.name,
+          email: s.email,
+          course: s.course,
+          macAddress: s.macAddress,
+          joinDate: s.joinDate || 'N/A',
+          status: s.status,
+          attendanceRate
+        };
+      });
     }
 
     const studentListData = {
@@ -1345,6 +1529,139 @@ const initializeAdmin = async () => {
     console.error('❌ Error seeding admin:', error);
   }
 };
+
+// ==================== ADMIN DATA RESET ENDPOINTS ====================
+
+// Reset attendance data for different time periods
+app.post('/api/admin/reset-attendance', async (req, res) => {
+  try {
+    const { period, confirmReset } = req.body;
+
+    if (!confirmReset) {
+      return res.status(400).json({ success: false, message: 'Reset confirmation required' });
+    }
+
+    if (useDatabase) {
+      let deleteQuery = {};
+      const now = new Date();
+
+      switch (period) {
+        case 'week':
+          const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          deleteQuery = { timestamp: { $gte: oneWeekAgo } };
+          break;
+        case 'month':
+          const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+          deleteQuery = { timestamp: { $gte: oneMonthAgo } };
+          break;
+        case 'all':
+          deleteQuery = {}; // Delete all attendance snapshots
+          break;
+        default:
+          return res.status(400).json({ success: false, message: 'Invalid period specified' });
+      }
+
+      const result = await AttendanceSnapshot.deleteMany(deleteQuery);
+      
+      res.json({
+        success: true,
+        message: `Successfully reset attendance data for ${period}`,
+        deletedCount: result.deletedCount
+      });
+    } else {
+      // In-memory mode - reset attendance history
+      inMemoryAttendanceHistory = [];
+      res.json({
+        success: true,
+        message: `Successfully reset attendance data for ${period}`,
+        deletedCount: 'N/A (in-memory mode)'
+      });
+    }
+  } catch (error) {
+    console.error('Error resetting attendance data:', error);
+    res.status(500).json({ success: false, message: 'Failed to reset attendance data', error: error.message });
+  }
+});
+
+// Reset all student data
+app.post('/api/admin/reset-students', async (req, res) => {
+  try {
+    const { confirmReset } = req.body;
+
+    if (!confirmReset) {
+      return res.status(400).json({ success: false, message: 'Reset confirmation required' });
+    }
+
+    if (useDatabase) {
+      // Reset students and their attendance data
+      const studentResult = await Student.deleteMany({});
+      const attendanceResult = await AttendanceSnapshot.deleteMany({});
+      
+      res.json({
+        success: true,
+        message: 'Successfully reset all student and attendance data',
+        deletedStudents: studentResult.deletedCount,
+        deletedAttendanceRecords: attendanceResult.deletedCount
+      });
+    } else {
+      // In-memory mode
+      inMemoryStudents.splice(0); // Clear array
+      inMemoryAttendanceHistory = [];
+      
+      res.json({
+        success: true,
+        message: 'Successfully reset all student and attendance data',
+        deletedStudents: 'All (in-memory mode)',
+        deletedAttendanceRecords: 'All (in-memory mode)'
+      });
+    }
+  } catch (error) {
+    console.error('Error resetting student data:', error);
+    res.status(500).json({ success: false, message: 'Failed to reset student data', error: error.message });
+  }
+});
+
+// Get system statistics for admin dashboard
+app.get('/api/admin/system-stats', async (req, res) => {
+  try {
+    let stats;
+
+    if (useDatabase) {
+      const totalStudents = await Student.countDocuments();
+      const activeStudents = await Student.countDocuments({ status: 'Active' });
+      const totalSnapshots = await AttendanceSnapshot.countDocuments();
+      
+      // Get latest snapshot for today's data
+      const latestSnapshot = await AttendanceSnapshot.findOne().sort({ timestamp: -1 });
+      
+      stats = {
+        totalStudents,
+        activeStudents,
+        inactiveStudents: totalStudents - activeStudents,
+        totalAttendanceRecords: totalSnapshots,
+        lastSnapshotTime: latestSnapshot?.timestamp || null,
+        todayPresent: latestSnapshot?.totalPresent || 0,
+        todayAbsent: latestSnapshot?.totalAbsent || 0
+      };
+    } else {
+      stats = {
+        totalStudents: inMemoryStudents.length,
+        activeStudents: inMemoryStudents.filter(s => s.status === 'Active').length,
+        inactiveStudents: inMemoryStudents.filter(s => s.status !== 'Active').length,
+        totalAttendanceRecords: inMemoryAttendanceHistory.length,
+        lastSnapshotTime: inMemoryAttendanceHistory.length > 0 ? 
+          inMemoryAttendanceHistory[inMemoryAttendanceHistory.length - 1].timestamp : null,
+        todayPresent: 0,
+        todayAbsent: 0
+      };
+    }
+
+    res.json({ success: true, stats });
+  } catch (error) {
+    console.error('Error getting system stats:', error);
+    res.status(500).json({ success: false, message: 'Failed to get system stats', error: error.message });
+  }
+});
 
 // Start server
 app.listen(PORT, async () => {

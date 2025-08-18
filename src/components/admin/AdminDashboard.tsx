@@ -10,6 +10,7 @@ import AttendanceReports from './AttendanceReports';
 import StudentManagement from './StudentManagement';
 import LiveMacData from './LiveMacData';
 import EmailSettings from './EmailSettings';
+import DataManagement from './DataManagement';
 
 const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -31,6 +32,7 @@ const AdminDashboard = () => {
             <Route path="/reports" element={<AttendanceReports />} />
             <Route path="/students" element={<StudentManagement />} />
             <Route path="/live-mac" element={<LiveMacData />} />
+            <Route path="/data-management" element={<DataManagement />} />
           </Routes>
         </main>
       </div>

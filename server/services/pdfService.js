@@ -7,7 +7,7 @@ class PDFService {
   async generateStudentAttendancePDF(attendanceData) {
     return new Promise((resolve, reject) => {
       try {
-        const doc = new PDFDocument({ margin: 50 });
+        const doc = new PDFDocument({ margin: 30 });
         const chunks = [];
 
         // Collect PDF data
@@ -17,32 +17,28 @@ class PDFService {
           resolve(pdfBuffer);
         });
 
-        // Header
-        this.addHeader(doc, 'Student Attendance Report');
+        // Compact Header
+        this.addCompactHeader(doc, 'Student Attendance Report');
         
-        // Student Information
-        doc.moveDown(2);
-        doc.fontSize(16).fillColor('#333333');
-        doc.text(`Student: ${attendanceData.studentName}`, { align: 'left' });
-        doc.text(`Course: ${attendanceData.course}`, { align: 'left' });
-        doc.text(`Email: ${attendanceData.email}`, { align: 'left' });
-        doc.text(`Period: ${attendanceData.period}`, { align: 'left' });
-        doc.text(`Report Generated: ${new Date().toLocaleDateString()}`, { align: 'left' });
+        // Student Information - Compact
+        doc.moveDown(1);
+        doc.fontSize(11).fillColor('#333333');
+        doc.text(`Student: ${attendanceData.studentName}  |  Course: ${attendanceData.course}`, { align: 'left' });
+        doc.text(`Email: ${attendanceData.email}  |  Period: ${attendanceData.period}`, { align: 'left' });
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, { align: 'left' });
 
-        // Attendance Summary Box
-        doc.moveDown(2);
-        this.drawSummaryBox(doc, attendanceData);
+        // Compact Attendance Summary
+        doc.moveDown(1);
+        this.drawCompactSummaryBox(doc, attendanceData);
 
-        // Attendance Details Table
-        doc.moveDown(3);
-        this.drawAttendanceTable(doc, attendanceData.attendanceRecords || []);
+        // Only show recent records table if space allows
+        if (attendanceData.attendanceRecords && attendanceData.attendanceRecords.length > 0) {
+          doc.moveDown(1);
+          this.drawCompactAttendanceTable(doc, attendanceData.attendanceRecords.slice(0, 8)); // Limit to 8 records
+        }
 
-        // Attendance Statistics
-        doc.moveDown(2);
-        this.drawStatistics(doc, attendanceData);
-
-        // Footer
-        this.addFooter(doc);
+        // Compact Footer
+        this.addCompactFooter(doc);
 
         doc.end();
       } catch (error) {
@@ -55,7 +51,7 @@ class PDFService {
   async generateClassSummaryPDF(summaryData) {
     return new Promise((resolve, reject) => {
       try {
-        const doc = new PDFDocument({ margin: 50 });
+        const doc = new PDFDocument({ margin: 30 });
         const chunks = [];
 
         doc.on('data', (chunk) => chunks.push(chunk));
@@ -64,28 +60,26 @@ class PDFService {
           resolve(pdfBuffer);
         });
 
-        // Header
-        this.addHeader(doc, 'Class Attendance Summary');
+        // Compact Header
+        this.addCompactHeader(doc, 'Class Attendance Summary');
 
-        // Summary Information
-        doc.moveDown(2);
-        doc.fontSize(16).fillColor('#333333');
-        doc.text(`Period: ${summaryData.period}`, { align: 'left' });
-        doc.text(`Total Students: ${summaryData.totalStudents}`, { align: 'left' });
-        doc.text(`Report Generated: ${new Date().toLocaleDateString()}`, { align: 'left' });
+        // Summary Information - Compact
+        doc.moveDown(1);
+        doc.fontSize(11).fillColor('#333333');
+        doc.text(`Period: ${summaryData.period}  |  Total Students: ${summaryData.totalStudents}  |  Generated: ${new Date().toLocaleDateString()}`, { align: 'left' });
 
-        // Class Statistics
-        doc.moveDown(2);
-        this.drawClassStatistics(doc, summaryData);
+        // Compact Class Statistics
+        doc.moveDown(1);
+        this.drawCompactClassStatistics(doc, summaryData);
 
-        // Student List Table
+        // Compact Student List Table
         if (summaryData.students && summaryData.students.length > 0) {
-          doc.moveDown(2);
-          this.drawStudentSummaryTable(doc, summaryData.students);
+          doc.moveDown(1);
+          this.drawCompactStudentSummaryTable(doc, summaryData.students.slice(0, 15)); // Limit to 15 students
         }
 
-        // Footer
-        this.addFooter(doc);
+        // Compact Footer
+        this.addCompactFooter(doc);
 
         doc.end();
       } catch (error) {
@@ -329,11 +323,11 @@ class PDFService {
     doc.text(`Page 1`, doc.page.width - 100, footerY + 20, { align: 'right' });
   }
 
-  // Generate student list PDF
+  // Generate student list PDF - Compact Version
   async generateStudentListPDF(studentListData) {
     return new Promise((resolve, reject) => {
       try {
-        const doc = new PDFDocument({ margin: 50 });
+        const doc = new PDFDocument({ margin: 30 });
         const chunks = [];
 
         doc.on('data', (chunk) => chunks.push(chunk));
@@ -342,25 +336,20 @@ class PDFService {
           resolve(pdfBuffer);
         });
 
-        // Header
-        this.addHeader(doc, 'Student List Report');
+        // Compact Header
+        this.addCompactHeader(doc, 'Student List Report');
 
-        // Report Information
-        doc.moveDown(2);
-        doc.fontSize(16).fillColor('#333333');
-        doc.text(`Generated: ${studentListData.generatedDate}`, { align: 'left' });
-        doc.text(`Total Students: ${studentListData.totalStudents}`, { align: 'left' });
+        // Report Information - Compact
+        doc.moveDown(1);
+        doc.fontSize(11).fillColor('#333333');
+        doc.text(`Generated: ${studentListData.generatedDate}  |  Total Students: ${studentListData.totalStudents}`, { align: 'left' });
 
-        // Summary Box
-        doc.moveDown(2);
-        this.drawStudentSummaryBox(doc, studentListData);
+        // Compact Student List Table
+        doc.moveDown(1);
+        this.drawCompactStudentListTable(doc, studentListData.students);
 
-        // Student List Table
-        doc.moveDown(2);
-        this.drawStudentListTable(doc, studentListData.students);
-
-        // Footer
-        this.addFooter(doc);
+        // Compact Footer
+        this.addCompactFooter(doc);
 
         doc.end();
       } catch (error) {
@@ -470,6 +459,267 @@ class PDFService {
     });
 
     doc.y = startY + rowHeight * (students.length + 1) + 10;
+  }
+
+  // ==================== COMPACT METHODS FOR SINGLE PAGE ====================
+
+  // Compact header
+  addCompactHeader(doc, title) {
+    doc.rect(30, 30, doc.page.width - 60, 50).fill('#3B82F6');
+    doc.fontSize(18).fillColor('white');
+    doc.text(title, 40, 45, { align: 'left' });
+    doc.fontSize(10).fillColor('white');
+    doc.text('School Network Tracker', doc.page.width - 150, 60, { align: 'right' });
+    doc.fillColor('#333333');
+    doc.y = 90;
+  }
+
+  // Compact summary box
+  drawCompactSummaryBox(doc, data) {
+    const boxY = doc.y;
+    const boxHeight = 60;
+    const boxWidth = doc.page.width - 60;
+
+    doc.rect(30, boxY, boxWidth, boxHeight).fill('#F8F9FA').stroke('#E5E7EB');
+
+    doc.fillColor('#333333');
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('Summary', 40, boxY + 10);
+
+    doc.fontSize(10).font('Helvetica');
+    doc.text(`Present: ${data.presentDays || 0}/${data.totalDays || 0} days`, 40, boxY + 25);
+    doc.text(`Attendance Rate: ${data.attendanceRate || 0}%`, 40, boxY + 40);
+    
+    // Status indicator
+    const rate = parseFloat(data.attendanceRate || 0);
+    const statusColor = rate >= 80 ? '#10B981' : rate >= 60 ? '#F59E0B' : '#EF4444';
+    const statusText = rate >= 80 ? 'Excellent' : rate >= 60 ? 'Good' : 'Poor';
+    
+    doc.fillColor(statusColor);
+    doc.text(`Status: ${statusText}`, 250, boxY + 25);
+    
+    doc.fillColor('#333333');
+    doc.y = boxY + boxHeight + 10;
+  }
+
+  // Compact attendance table
+  drawCompactAttendanceTable(doc, records) {
+    if (!records || records.length === 0) return;
+
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('Recent Records', { align: 'left' });
+    doc.moveDown(0.5);
+
+    const startY = doc.y;
+    const rowHeight = 15;
+    const colWidths = [80, 60, 70, 120];
+    const tableWidth = colWidths.reduce((sum, width) => sum + width, 0);
+
+    // Headers
+    doc.fontSize(9).font('Helvetica-Bold');
+    let currentX = 30;
+    
+    doc.rect(30, startY, tableWidth, rowHeight).fill('#F3F4F6').stroke('#E5E7EB');
+    doc.fillColor('#374151');
+    doc.text('Date', currentX + 3, startY + 5);
+    currentX += colWidths[0];
+    doc.text('Status', currentX + 3, startY + 5);
+    currentX += colWidths[1];
+    doc.text('Time', currentX + 3, startY + 5);
+    currentX += colWidths[2];
+    doc.text('Notes', currentX + 3, startY + 5);
+
+    // Rows
+    doc.font('Helvetica').fillColor('#333333');
+    
+    records.forEach((record, index) => {
+      const rowY = startY + rowHeight * (index + 1);
+      
+      if (index % 2 === 1) {
+        doc.rect(30, rowY, tableWidth, rowHeight).fill('#F9FAFB').stroke('#E5E7EB');
+      } else {
+        doc.rect(30, rowY, tableWidth, rowHeight).stroke('#E5E7EB');
+      }
+
+      currentX = 30;
+      doc.text(record.date || 'N/A', currentX + 3, rowY + 3);
+      currentX += colWidths[0];
+      
+      const statusColor = record.status === 'Present' ? '#10B981' : '#EF4444';
+      doc.fillColor(statusColor);
+      doc.text(record.status || 'N/A', currentX + 3, rowY + 3);
+      doc.fillColor('#333333');
+      currentX += colWidths[1];
+      
+      doc.text(record.timeIn || 'N/A', currentX + 3, rowY + 3);
+      currentX += colWidths[2];
+      doc.text((record.notes || '').substring(0, 15), currentX + 3, rowY + 3);
+    });
+
+    doc.y = startY + rowHeight * (records.length + 1) + 10;
+  }
+
+  // Compact class statistics
+  drawCompactClassStatistics(doc, data) {
+    const boxY = doc.y;
+    const boxHeight = 60;
+    const boxWidth = doc.page.width - 60;
+
+    doc.rect(30, boxY, boxWidth, boxHeight).fill('#F8F9FA').stroke('#E5E7EB');
+
+    doc.fillColor('#333333');
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('Class Overview', 40, boxY + 10);
+
+    doc.fontSize(10).font('Helvetica');
+    doc.text(`Average Attendance: ${data.averageAttendance || 0}%`, 40, boxY + 25);
+    doc.text(`Present Today: ${data.presentToday || 0}`, 40, boxY + 40);
+    doc.text(`Absent Today: ${data.absentToday || 0}`, 200, boxY + 25);
+    doc.text(`Total Days: ${data.totalClassDays || 0}`, 200, boxY + 40);
+
+    doc.y = boxY + boxHeight + 10;
+  }
+
+  // Compact student summary table
+  drawCompactStudentSummaryTable(doc, students) {
+    if (!students || students.length === 0) return;
+
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('Student Summary', { align: 'left' });
+    doc.moveDown(0.5);
+
+    const startY = doc.y;
+    const rowHeight = 15;
+    const colWidths = [120, 80, 50, 50];
+    const tableWidth = colWidths.reduce((sum, width) => sum + width, 0);
+
+    // Headers
+    doc.fontSize(9).font('Helvetica-Bold');
+    let currentX = 30;
+    
+    doc.rect(30, startY, tableWidth, rowHeight).fill('#F3F4F6').stroke('#E5E7EB');
+    doc.fillColor('#374151');
+    doc.text('Name', currentX + 3, startY + 5);
+    currentX += colWidths[0];
+    doc.text('Course', currentX + 3, startY + 5);
+    currentX += colWidths[1];
+    doc.text('Present', currentX + 3, startY + 5);
+    currentX += colWidths[2];
+    doc.text('Rate %', currentX + 3, startY + 5);
+
+    // Rows
+    doc.font('Helvetica').fillColor('#333333');
+    
+    students.forEach((student, index) => {
+      const rowY = startY + rowHeight * (index + 1);
+      
+      if (index % 2 === 1) {
+        doc.rect(30, rowY, tableWidth, rowHeight).fill('#F9FAFB').stroke('#E5E7EB');
+      } else {
+        doc.rect(30, rowY, tableWidth, rowHeight).stroke('#E5E7EB');
+      }
+
+      currentX = 30;
+      doc.text((student.name || 'N/A').substring(0, 18), currentX + 3, rowY + 3);
+      currentX += colWidths[0];
+      doc.text((student.course || 'N/A').substring(0, 12), currentX + 3, rowY + 3);
+      currentX += colWidths[1];
+      doc.text(`${student.presentDays || 0}`, currentX + 3, rowY + 3);
+      currentX += colWidths[2];
+      
+      const rate = student.attendanceRate || 0;
+      const rateColor = rate >= 80 ? '#10B981' : rate >= 60 ? '#F59E0B' : '#EF4444';
+      doc.fillColor(rateColor);
+      doc.text(`${rate}%`, currentX + 3, rowY + 3);
+      doc.fillColor('#333333');
+    });
+
+    doc.y = startY + rowHeight * (students.length + 1) + 10;
+  }
+
+  // Compact footer
+  addCompactFooter(doc) {
+    const footerY = doc.page.height - 50;
+    doc.fontSize(8).fillColor('#666666');
+    doc.text(`Generated on ${new Date().toLocaleString()} | School Network Tracker`, 30, footerY, { align: 'center' });
+  }
+
+  // Compact student list table
+  drawCompactStudentListTable(doc, students) {
+    if (!students || students.length === 0) {
+      doc.text('No students found.', { align: 'center' });
+      return;
+    }
+
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('Student Details', { align: 'left' });
+    doc.moveDown(0.5);
+
+    const startY = doc.y;
+    const rowHeight = 15;
+    const colWidths = [100, 90, 70, 50, 50];
+    const tableWidth = colWidths.reduce((sum, width) => sum + width, 0);
+
+    // Headers
+    doc.fontSize(9).font('Helvetica-Bold');
+    let currentX = 30;
+    
+    doc.rect(30, startY, tableWidth, rowHeight).fill('#F3F4F6').stroke('#E5E7EB');
+    doc.fillColor('#374151');
+    doc.text('Name', currentX + 3, startY + 5);
+    currentX += colWidths[0];
+    doc.text('Email', currentX + 3, startY + 5);
+    currentX += colWidths[1];
+    doc.text('Course', currentX + 3, startY + 5);
+    currentX += colWidths[2];
+    doc.text('Status', currentX + 3, startY + 5);
+    currentX += colWidths[3];
+    doc.text('Rate %', currentX + 3, startY + 5);
+
+    // Rows - Limit to fit on one page
+    doc.font('Helvetica').fillColor('#333333');
+    const maxStudents = Math.min(students.length, 30); // Limit to 30 students for single page
+    
+    for (let index = 0; index < maxStudents; index++) {
+      const student = students[index];
+      const rowY = startY + rowHeight * (index + 1);
+      
+      if (index % 2 === 1) {
+        doc.rect(30, rowY, tableWidth, rowHeight).fill('#F9FAFB').stroke('#E5E7EB');
+      } else {
+        doc.rect(30, rowY, tableWidth, rowHeight).stroke('#E5E7EB');
+      }
+
+      currentX = 30;
+      doc.text((student.name || 'N/A').substring(0, 15), currentX + 3, rowY + 3);
+      currentX += colWidths[0];
+      doc.text((student.email || 'N/A').substring(0, 13), currentX + 3, rowY + 3);
+      currentX += colWidths[1];
+      doc.text((student.course || 'N/A').substring(0, 10), currentX + 3, rowY + 3);
+      currentX += colWidths[2];
+      
+      // Status with color
+      const statusColor = student.status === 'Active' ? '#10B981' : '#EF4444';
+      doc.fillColor(statusColor);
+      doc.text(student.status || 'N/A', currentX + 3, rowY + 3);
+      doc.fillColor('#333333');
+      currentX += colWidths[3];
+      
+      const rate = student.attendanceRate || 0;
+      const rateColor = rate >= 80 ? '#10B981' : rate >= 60 ? '#F59E0B' : '#EF4444';
+      doc.fillColor(rateColor);
+      doc.text(`${rate}%`, currentX + 3, rowY + 3);
+      doc.fillColor('#333333');
+    }
+
+    // If there are more students, add a note
+    if (students.length > maxStudents) {
+      doc.moveDown(1);
+      doc.fontSize(9).fillColor('#666666');
+      doc.text(`Note: Showing first ${maxStudents} of ${students.length} students. Use filters for specific students.`, { align: 'center' });
+    }
+
+    doc.y = startY + rowHeight * (maxStudents + 1) + 20;
   }
 }
 

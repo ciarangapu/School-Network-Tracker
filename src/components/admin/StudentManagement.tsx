@@ -2,8 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, Users, Mail, Download } from 'lucide-react';
 import ApiService from '../../services/api';
 
+interface Student {
+  id: string;
+  _id: string;
+  name: string;
+  email: string;
+  macAddress: string;
+  course: string;
+  status: string;
+  createdAt?: string;
+  joinDate: string;
+  attendanceRate: number;
+  presentCount?: number;
+  totalSnapshots?: number;
+}
+
 const StudentManagement = () => {
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [emailAddress, setEmailAddress] = useState('');
   const [showEmailDialog, setShowEmailDialog] = useState(false);
@@ -12,7 +27,7 @@ const StudentManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingStudent, setEditingStudent] = useState(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
   const courses = [
     'All Courses',
@@ -40,11 +55,12 @@ const StudentManagement = () => {
     try {
       setIsLoading(true);
       const studentsData = await ApiService.getStudents();
-      setStudents(studentsData.map(student => ({
+      setStudents(studentsData.map((student: any) => ({
         ...student,
         id: student._id,
         joinDate: student.createdAt ? new Date(student.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        attendanceRate: 0 // Will be calculated from attendance data
+        // Use the actual attendance rate from the server
+        attendanceRate: student.attendanceRate || 0
       })));
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -114,7 +130,7 @@ const StudentManagement = () => {
     setShowAddModal(true);
   };
 
-  const deleteStudent = (id: number) => {
+  const deleteStudent = (id: string) => {
     // Implement delete API call
     console.log('Delete student:', id);
     setStudents(students.filter(student => student.id !== id));

@@ -13,7 +13,8 @@ import {
   Calendar,
   FileText,
   Wifi,
-  Mail
+  Mail,
+  Database
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -69,6 +70,11 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       name: 'Live MAC Data',
       href: '/admin/live-mac',
       icon: Wifi
+    },
+    {
+      name: 'Data Management',
+      href: '/admin/data-management',
+      icon: Database
     },
     {
       name: 'Attendance Reports',
