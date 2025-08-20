@@ -1,4 +1,14 @@
 import React, { useState } from 'react';
+
+type ShiftType = {
+  id: number;
+  name: string;
+  startTime: string;
+  endTime: string;
+  days: string[];
+  active: boolean;
+  emailNotification: boolean;
+};
 import { Plus, Edit, Trash2, Clock } from 'lucide-react';
 
 const ShiftSettings = () => {
@@ -9,7 +19,8 @@ const ShiftSettings = () => {
       startTime: '09:00',
       endTime: '18:00',
       days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-      active: true
+      active: true,
+      emailNotification: true
     },
     {
       id: 2,
@@ -17,7 +28,8 @@ const ShiftSettings = () => {
       startTime: '13:00',
       endTime: '22:00',
       days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-      active: true
+      active: true,
+      emailNotification: true
     },
     {
       id: 3,
@@ -25,32 +37,41 @@ const ShiftSettings = () => {
       startTime: '10:00',
       endTime: '16:00',
       days: ['Saturday', 'Sunday'],
-      active: false
+      active: false,
+      emailNotification: false
     }
   ]);
 
   const [showModal, setShowModal] = useState(false);
   const [editingShift, setEditingShift] = useState(null);
-  const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<{
+      name: string;
+      startTime: string;
+      endTime: string;
+      days: string[];
+      active: boolean;
+      emailNotification: boolean;
+    }>({
     name: '',
     startTime: '09:00',
     endTime: '18:00',
-    days: [],
-    active: true
+      days: [] as string[],
+    active: true,
+    emailNotification: true
   });
 
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingShift) {
-      setShifts(shifts.map(shift => 
+    if (editingShift !== null) {
+      setShifts(shifts.map((shift: ShiftType) => 
         shift.id === editingShift.id 
-          ? { ...shift, ...formData }
+          ? { ...shift, ...formData } as ShiftType
           : shift
       ));
     } else {
-      setShifts([...shifts, { ...formData, id: Date.now() }]);
+      setShifts([...shifts, { ...formData, id: Date.now() } as ShiftType]);
     }
     resetForm();
   };
@@ -61,7 +82,8 @@ const ShiftSettings = () => {
       startTime: '09:00',
       endTime: '18:00',
       days: [],
-      active: true
+      active: true,
+      emailNotification: true
     });
     setEditingShift(null);
     setShowModal(false);
@@ -74,7 +96,8 @@ const ShiftSettings = () => {
       startTime: shift.startTime,
       endTime: shift.endTime,
       days: shift.days,
-      active: shift.active
+      active: shift.active,
+      emailNotification: shift.emailNotification
     });
     setShowModal(true);
   };
@@ -160,6 +183,18 @@ const ShiftSettings = () => {
                   {shift.active ? 'Active' : 'Inactive'}
                 </span>
               </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-sm text-gray-600">Email Notification:</span>
+                <span
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    shift.emailNotification
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  {shift.emailNotification ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
             </div>
           </div>
         ))}
@@ -241,6 +276,15 @@ const ShiftSettings = () => {
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-sm text-gray-700">Active</span>
+                </label>
+                <label className="flex items-center space-x-2 mt-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.emailNotification}
+                    onChange={(e) => setFormData({...formData, emailNotification: e.target.checked})}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Email Notification</span>
                 </label>
               </div>
 
