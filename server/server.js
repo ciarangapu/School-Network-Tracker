@@ -294,6 +294,36 @@ const sendShiftAttendanceEmails = async (snapshot) => {
       return;
     }
 
+    // Determine if email notification is enabled for this shift
+    // Assume snapshot.shiftId or snapshot.shiftName is available (adjust as needed)
+    let emailEnabled = true;
+    if (snapshot.shiftId || snapshot.shiftName) {
+      // Find the shift config (from DB or in-memory)
+      let shiftConfig = null;
+      if (useDatabase && typeof Shift !== 'undefined') {
+        // If you have a Shift model, fetch from DB
+        shiftConfig = await Shift.findOne({
+          $or: [
+            { _id: snapshot.shiftId },
+            { name: snapshot.shiftName }
+          ]
+        });
+      } else if (Array.isArray(currentSettings?.shifts)) {
+        shiftConfig = currentSettings.shifts.find(s =>
+          (snapshot.shiftId && s.id === snapshot.shiftId) ||
+          (snapshot.shiftName && s.name === snapshot.shiftName)
+        );
+      }
+      if (shiftConfig && shiftConfig.emailNotification === false) {
+        emailEnabled = false;
+      }
+    }
+
+    if (!emailEnabled) {
+      console.log('⚠️ Shift email notification disabled, skipping emails for this shift');
+      return;
+    }
+
     // Initialize email service
     await emailService.initialize(currentSettings.emailConfig);
 
